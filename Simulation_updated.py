@@ -7,37 +7,33 @@ from matplotlib.widgets import Button
 import Graph
 import Calc_updated
 
-
-# Initialisieren
-
-# Wähle Graph:
-# G, pos = Graph.create_ring_of_cliques(5, 5)
-G, pos = Graph.create_random_d_regular_graph()
-
-# Wähle Cut:
-cut_set = Graph.generate_random_cut(G)
-# Ring of cliques:
-# cut_set = {"C0_2", "C0_3"}
-# cut_set = {"C1_4", "C1_3", "C1_2", "C1_1", "C1_0"}  # worst cut
-
+# Wähle Art des Graphen (Ring of Cliques, random ,... TO DO)
+type_of_graph = "rof"
+#type_of_graph = "random"
+if type_of_graph == "rof":
+    G, pos = Graph.create_ring_of_cliques(5, 5)
+    cut_set = {"C1_4", "C1_3", "C1_2", "C1_1", "C1_0"}
+    # cut_set = {"C0_2", "C0_3"}
+    d = 4
+elif type_of_graph == "random":
+    G, pos = Graph.create_random_d_regular_graph()
+    cut_set = Graph.generate_random_cut(G)
+    d = Calc_updated.calculate_d(G)
+else: 
+    print("Wähl einen gültigen Graph aus: {rof, random}")
 
 graphs = [copy.deepcopy(G)]
 cut_strains = []
 cheeger_constants = []
 cut_edges_list = []
 flip_info = []
-# strain, conductance, cut_edges = cut_metrics(G, cut_set)
 expected_cut_strains = []
-strain, cut_edges = Calc_updated.cut_metrics(G, cut_set)
+strain, conductance, cut_edges = Calc_updated.cut_metrics(G, cut_set, d)
 cut_size = len(cut_edges)
 cut_strains.append(strain)
-
-
-
 cheeger_constants.append(cut_size)
 cut_edges_list.append(cut_edges)
 flip_info.append((set(), set()))
-
 current_G = G
 number_flips = 400
 while len(graphs) <= number_flips:
@@ -46,19 +42,19 @@ while len(graphs) <= number_flips:
         continue
     current_G = new_G
     graphs.append(copy.deepcopy(current_G))
-    # strain, conductance, cut_edges = cut_metrics(current_G, cut_set)
-    strain, cut_edges = Calc_updated.cut_metrics(current_G, cut_set)
+    strain, conductance, cut_edges = Calc_updated.cut_metrics(current_G, cut_set, d)
+    # strain, cut_edges = Calc_updated.cut_metrics(current_G, cut_set)
     cut_size = len(cut_edges)
     cut_strains.append(strain)
 
-    expected_strain = Calc_updated.expected_cut_strain_exact(current_G, cut_set)
+    expected_strain = Calc_updated.expected_cut_strain_exact(current_G, cut_set, d)
     expected_cut_strains.append(expected_strain)
 
     cheeger_constants.append(cut_size)
     cut_edges_list.append(cut_edges)
     flip_info.append((removed, added))
 
-expected_strain = Calc_updated.expected_cut_strain_exact(current_G, cut_set)
+expected_strain = Calc_updated.expected_cut_strain_exact(current_G, cut_set, d)
 expected_cut_strains.append(expected_strain)
 
 # Interaktive Ansicht mit 2 Achsen
@@ -69,10 +65,6 @@ ax_strain = fig.add_subplot(gs[1, 0])
 ax_graph = fig.add_subplot(gs[:, 1])
 plt.subplots_adjust(bottom=0.2, hspace=0.4, wspace=0.3)
 current_step = [0]
-
-
-
-
 
 def draw_flip_step(index):
     ax_cutsize.clear()
@@ -134,6 +126,7 @@ def draw_flip_step(index):
         f"Cut-Strain: {cut_strains[index]:.3f}, "
         f"Expected Cut-Strain: {expected_cut_strains[index]:.3f}, \n"
         f"Cut-Size: {cheeger_constants[index]}, \n"
+        f"Conductance: {conductance}, \n"
         f"Removed Edges: {removed_edges}, \n"
         f"Added Edges: {added_edges}"
     )
