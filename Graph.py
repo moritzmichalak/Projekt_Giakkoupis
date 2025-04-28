@@ -16,6 +16,16 @@ def create_random_d_regular_graph(seed=None):
     pos = nx.spring_layout(G, seed=42)  # feste Knotenpositionen
     return G, pos
 
+def create_random_even_cycle_graph(seed=None):
+    # d = 2
+    min_n, max_n = 8, 30 
+    rng = random.Random(seed)
+    #Da d = 2 und d * n gerade sein muss, wähle n gerade: 
+    possible_n = [num for num in range(min_n, max_n + 1) if num % 2 == 0]
+    n = rng.choice(possible_n)
+    G = nx.cycle_graph(n)
+    pos = nx.circular_layout(G)  # Fixiertes Kreis-Layout
+    return G, pos, n
 
 def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
     num_cliques = p_num_cliques

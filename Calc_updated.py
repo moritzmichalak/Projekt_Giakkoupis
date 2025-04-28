@@ -30,7 +30,6 @@ def cut_metrics(G, S, d):
     #return strain, cut_edges
 
 def calculate_d(G):
-    # TO DO: Obergrenze aus Paper für d: O(log^2 n)
     d = next(iter(dict(G.degree()).values()))
     return d
 
@@ -96,8 +95,10 @@ def expected_cut_strain_exact(G, S, d):
 
         return 0
 
-    # Original strain
-    sigma_G = sum(alpha(u) * (1 - alpha(u)) for u in G.nodes)
+    # Tatsächlicher cut-strain:
+
+    cut_strain, conductance, cut_edges = cut_metrics(G, S, d)
+    # sigma_G = sum(alpha(u) * (1 - alpha(u)) for u in G.nodes)
 
     # Summation terms
     sum_diff_squared = 0
@@ -107,6 +108,6 @@ def expected_cut_strain_exact(G, S, d):
         sum_diff_squared += diff ** 2
         sum_gamma += gamma(u, v)
 
-    expected = sigma_G + (4 * delta / m) * sum_diff_squared - (delta ** 2 / m) * sum_gamma
+    expected = cut_strain + (4 * delta / m) * sum_diff_squared - (delta ** 2 / m) * sum_gamma
     return expected
 
