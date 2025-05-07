@@ -26,7 +26,27 @@ def create_random_even_cycle_graph(seed=None):
     G = nx.cycle_graph(n)
     pos = nx.circular_layout(G)  # Fixiertes Kreis-Layout
     return G, pos, n
+'''
+def create_torus():
+    # Breite und Höhe des Torus-Gitters (m × n)
+    a = 5  # Zeilen
+    b = 5  # Spalten
+    n = a * b
 
+    # Erstelle einen 2D-Torus (4-regulär)
+    G = nx.grid_2d_graph(b, a, periodic=True)
+
+    # Optional: Knoten als Strings umwandeln (statt (i,j)-Tupel)
+    #G = nx.convert_node_labels_to_integers(G)
+
+    # Layout
+    pos = nx.spring_layout(G, seed=42)
+
+    # Zeichnen
+    nx.draw(G, pos, with_labels=True, node_color="lightblue", node_size=500)
+    plt.title(f"4-regulärer Torus: {b}×{a}")
+    return G, pos, n
+'''
 def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
     num_cliques = p_num_cliques
     clique_size = p_clique_size

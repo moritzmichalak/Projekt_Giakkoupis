@@ -6,21 +6,27 @@ import numpy as np
 import Graph
 import Calc_updated
 
+# Auswahl Graph durch User
+print("Choose: 1 = Ring of Cliques ; 2 = Random Graph ; 3 = Ring ; 4 = Torus")
+index_of_graph = int(input()) - 1
+list_of_graphs = ["Ring of Cliques", "Random Graph", "Ring", "Torus"]
+type_of_graph = list_of_graphs[index_of_graph]
 # Einstellungen
-type_of_graph = "ring"  # {ring_of_cliques, random, ring}
-num_simulations = 1
+#type_of_graph = "ring_of_cliques"  # {ring_of_cliques, random, ring}
+num_simulations = 30
 max_flips = 1000  # Optional: Begrenzung für Simulationen (zum Testen)
 
 # Graph initialisieren
-if type_of_graph == "ring_of_cliques":
+if type_of_graph == "Ring of Cliques":
     G, pos = Graph.create_ring_of_cliques(5, 5)
-    cut_set = {f"C1_{i}" for i in range(5)}
+    cut_set = Graph.generate_random_cut(G)
+    # cut_set = {f"C1_{i}" for i in range(5)}
     d = 4
-elif type_of_graph == "random":
+elif type_of_graph == "Random Graph":
     G, pos = Graph.create_random_d_regular_graph()
     cut_set = Graph.generate_random_cut(G)
     d = Calc_updated.calculate_d(G)
-elif type_of_graph == "ring":
+elif type_of_graph == "Ring":
     G, pos, n = Graph.create_random_even_cycle_graph(seed=42)
     d = 2
     cut_set = Graph.generate_random_cut(G)
@@ -96,6 +102,14 @@ std_cut_size = np.std(cut_sizes_np, axis=0)
 mean_conductance = np.mean(conductances_np, axis=0)
 std_conductance = np.std(conductances_np, axis=0)
 
+# Anfangsgraph mit Cut anzeigen
+plt.figure(figsize=(8, 6))
+node_colors = ["yellow" if n in cut_set else "lightblue" for n in G.nodes()]
+nx.draw(G, pos, with_labels=True, node_color=node_colors,
+        node_size=500, font_size=10)
+plt.title("Anfangsgraph mit Cut")
+plt.show()
+
 # Plots anzeigen
 fig, axs = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
 steps = range(len(mean_cut_strain))
@@ -134,10 +148,4 @@ plt.xlabel("Flip-Schritte")
 plt.tight_layout()
 plt.show()
 
-# Anfangsgraph mit Cut anzeigen
-plt.figure(figsize=(8, 6))
-node_colors = ["yellow" if n in cut_set else "lightblue" for n in G.nodes()]
-nx.draw(G, pos, with_labels=True, node_color=node_colors,
-        node_size=500, font_size=10)
-plt.title("Anfangsgraph mit Cut")
-plt.show()
+

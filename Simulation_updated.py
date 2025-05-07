@@ -10,8 +10,9 @@ import Calc_updated
 
 # Wähle Art des Graphen (Ring of Cliques, random ,... TO DO)
 type_of_graph = "ring_of_cliques"
-# type_of_graph = "ring"
+#type_of_graph = "ring"
 #type_of_graph = "random"
+# type_of_graph = "torus"
 
 if type_of_graph == "ring_of_cliques":
     G, pos = Graph.create_ring_of_cliques(5, 5)
@@ -26,8 +27,12 @@ elif type_of_graph == "ring":
     G, pos, n = Graph.create_random_even_cycle_graph(seed=42)
     d = 2
     cut_set = Graph.generate_random_cut(G) 
-#elif type_of_graph == "torus":
-    #TO DO
+    '''
+elif type_of_graph == "torus":
+    G, pos, n = Graph.create_torus(seed=42)
+    d = 4
+    cut_set = Graph.generate_random_cut(G) 
+    '''
 else: 
     print("Wähle einen gültigen Graph aus: {ring_of_cliques, ring, random, ...}")
     
