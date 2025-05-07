@@ -7,8 +7,8 @@ import Graph
 import Calc_updated
 
 # Einstellungen
-type_of_graph = "ring_of_cliques"  # {ring_of_cliques, random, ring}
-num_simulations = 30
+type_of_graph = "ring"  # {ring_of_cliques, random, ring}
+num_simulations = 1
 max_flips = 1000  # Optional: Begrenzung für Simulationen (zum Testen)
 
 # Graph initialisieren
@@ -97,17 +97,15 @@ mean_conductance = np.mean(conductances_np, axis=0)
 std_conductance = np.std(conductances_np, axis=0)
 
 # Plots anzeigen
-fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+fig, axs = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
 steps = range(len(mean_cut_strain))
 
 axs[0].plot(steps, mean_cut_size, label="Avg Cut Size", color="orange")
 axs[0].fill_between(steps, mean_cut_size - std_cut_size,
                     mean_cut_size + std_cut_size, color="orange", alpha=0.3)
-axs[0].plot(steps, mean_conductance, label="Avg Conductance", color="green")
-axs[0].fill_between(steps, mean_conductance - std_conductance,
-                    mean_conductance + std_conductance, color="green", alpha=0.3)
+
 axs[0].legend()
-axs[0].set_title("Durchschnittliche Cut Size und Conductance")
+axs[0].set_title("Durchschnittliche Cut Size")
 axs[0].grid(True)
 
 axs[1].plot(steps, mean_cut_strain, label="Avg Cut Strain", color="blue")
@@ -124,6 +122,13 @@ axs[2].fill_between(steps, mean_expected_strain - std_expected_strain,
 axs[2].legend()
 axs[2].set_title("Durchschnittliche Erwartete Cut Strain")
 axs[2].grid(True)
+
+axs[3].plot(steps, mean_conductance, label="Avg Conductance", color="green")
+axs[3].fill_between(steps, mean_conductance - std_conductance,
+                    mean_conductance + std_conductance, color="green", alpha=0.3)
+axs[3].legend()
+axs[3].set_title("Conductance")
+axs[3].grid(True)
 
 plt.xlabel("Flip-Schritte")
 plt.tight_layout()
