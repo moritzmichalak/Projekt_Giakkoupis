@@ -8,41 +8,41 @@ import Graph
 import math
 import Calc_updated
 
-# Wähle Art des Graphen (Ring of Cliques, random ,... TO DO)
-type_of_graph = "ring_of_cliques"
-#type_of_graph = "ring"
-#type_of_graph = "random"
-# type_of_graph = "torus"
+# Auswahl Graph durch User
+print("Choose: 1 = Ring of Cliques ; 2 = Random Graph ; 3 = Ring ; 4 = Torus")
+index_of_graph = int(input()) - 1
+list_of_graphs = ["Ring of Cliques", "Random Graph", "Ring", "Torus"]
+type_of_graph = list_of_graphs[index_of_graph]
+# Einstellungen
+#type_of_graph = "ring_of_cliques"  # {ring_of_cliques, random, ring}
+num_simulations = 30
+max_flips = 1000  # Optional: Begrenzung für Simulationen (zum Testen)
 
-if type_of_graph == "ring_of_cliques":
+# Graph initialisieren
+if type_of_graph == "Ring of Cliques":
     G, pos = Graph.create_ring_of_cliques(5, 5)
-    cut_set = {"C1_4", "C1_3", "C1_2", "C1_1", "C1_0"}
-    # cut_set = {"C0_2", "C0_3"}
+    # cut_set = Graph.generate_random_cut(G)
+    cut_set = {f"C1_{i}" for i in range(5)}
     d = 4
-elif type_of_graph == "random":
+elif type_of_graph == "Random Graph":
     G, pos = Graph.create_random_d_regular_graph()
     cut_set = Graph.generate_random_cut(G)
     d = Calc_updated.calculate_d(G)
-elif type_of_graph == "ring":
+elif type_of_graph == "Ring":
     G, pos, n = Graph.create_random_even_cycle_graph(seed=42)
     d = 2
-    cut_set = Graph.generate_random_cut(G) 
-    '''
-elif type_of_graph == "torus":
-    G, pos, n = Graph.create_torus(seed=42)
-    d = 4
-    cut_set = Graph.generate_random_cut(G) 
-    '''
-else: 
-    print("Wähle einen gültigen Graph aus: {ring_of_cliques, ring, random, ...}")
+    cut_set = Graph.generate_random_cut(G)
+else:
+    raise ValueError("Ungültiger Graph-Typ")
     
 n = len(G.nodes) # Anzahl der Knoten
 # Überprüfe, ob d zu groß:
 if d > (math.log2(n)**2):
-    print("d is too big!")
+    raise ValueError("Ungültiger Graph-Typ")
 else:
     # Obergrenze berechnen n⋅d⋅(log(n)^2)
-    upper_bound = int(n * d * (math.log2(n))**2) 
+    upper_bound = 50
+    # upper_bound = int(n * d * (math.log2(n))**2) 
 
     # Initialisieren:
     graphs = [copy.deepcopy(G)]
@@ -57,7 +57,7 @@ else:
     # Erste Berechnung
     strain, conductance, cut_edges = Calc_updated.cut_metrics(G, cut_set, d)
     cut_size = len(cut_edges)
-    expected_strain = Calc_updated.expected_cut_strain_exact(G, cut_set, d)
+    expected_strain = Calc_updated.expected_cut_strain_exact(G, cut_set, d, strain)
 
     # strain, conductance, cut_edges = Calc_updated.cut_metrics(G, cut_set, d)
     cut_strains.append(strain)
@@ -77,7 +77,7 @@ else:
         current_G = new_G
         graphs.append(copy.deepcopy(current_G))
         strain, conductance, cut_edges = Calc_updated.cut_metrics(current_G, cut_set, d)
-        expected_strain = Calc_updated.expected_cut_strain_exact(current_G, cut_set, d)
+        expected_strain = Calc_updated.expected_cut_strain_exact(current_G, cut_set, d, strain)
         cut_size = len(cut_edges)
 
         cut_strains.append(strain)
@@ -128,7 +128,14 @@ else:
     
         # Plot 2: Strain and Expected Strain
         ax_strain.plot(range(len(cut_strains)), cut_strains, label="Cut Strain", color='blue')
-        ax_strain.plot(range(len(expected_cut_strains)), expected_cut_strains, label="Expected Cut Strain", color='purple')
+        # ax_strain.plot(range(len(expected_cut_strains)), expected_cut_strains, label="Expected Cut Strain", color='purple')
+        # Expected Strain um eins versetzt
+        ax_strain.plot(
+        range(1, len(expected_cut_strains)),
+        expected_cut_strains[:-1],
+        label="Expected Cut Strain (nach Flip)",
+        color='purple'
+        )
         ax_strain.axvline(index, color='gray', linestyle='--')
         ax_strain.axvline(upper_bound, color='red', linestyle=':', label='Upper Bound')
         ax_strain.set_ylabel("Strain")
@@ -178,10 +185,16 @@ else:
             node_size=500,
             font_size=8
         )
+
+        if index == 0:
+            ecs_display = "N/A"  # Keine ECS vor der ersten Flip-Operation
+        else:
+            ecs_display = f"{expected_cut_strains[index - 1]:.3f}"
+
         ax_graph.set_title(
             f"Flip-Schritt {index}: \n"
             f"d =  {d}, n = {n}, Upper Bound = {upper_bound} \n"
-            f"Cut-Strain: {cut_strains[index]:.3f}, Expected Cut-Strain: {expected_cut_strains[index]:.3f}, "
+            f"Cut-Strain: {cut_strains[index]:.3f}, Expected Cut-Strain (nach Flip): {ecs_display}, "
             f"Cut-Size: {cut_sizes[index]},Conductance: {conductances[index]} \n"
             f"Removed Edges: {removed_edges}, Added Edges: {added_edges}"
         )

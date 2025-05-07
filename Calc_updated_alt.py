@@ -33,11 +33,11 @@ def calculate_d(G):
     d = next(iter(dict(G.degree()).values()))
     return d
 
-def expected_cut_strain_exact(G, S, d, strain):
+def expected_cut_strain_exact(G, S, d):
     V = set(G.nodes)
     n = len(V)
     m = G.number_of_edges()
-    # d = next(iter(dict(G.degree()).values()))  # assumes d-regular
+    d = next(iter(dict(G.degree()).values()))  # assumes d-regular
     delta = 1 / d
 
     def Gamma(u):
@@ -97,7 +97,7 @@ def expected_cut_strain_exact(G, S, d, strain):
 
     # Tatsächlicher cut-strain:
 
-    # cut_strain, conductance, cut_edges = cut_metrics(G, S, d)
+    cut_strain, conductance, cut_edges = cut_metrics(G, S, d)
     # sigma_G = sum(alpha(u) * (1 - alpha(u)) for u in G.nodes)
 
     # Summation terms
@@ -108,6 +108,6 @@ def expected_cut_strain_exact(G, S, d, strain):
         sum_diff_squared += diff ** 2
         sum_gamma += gamma(u, v)
 
-    expected = strain + (4 * delta / m) * sum_diff_squared - (delta ** 2 / m) * sum_gamma
+    expected = cut_strain + (4 * delta / m) * sum_diff_squared - (delta ** 2 / m) * sum_gamma
     return expected
 

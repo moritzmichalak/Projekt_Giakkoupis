@@ -19,8 +19,8 @@ max_flips = 1000  # Optional: Begrenzung für Simulationen (zum Testen)
 # Graph initialisieren
 if type_of_graph == "Ring of Cliques":
     G, pos = Graph.create_ring_of_cliques(5, 5)
-    cut_set = Graph.generate_random_cut(G)
-    # cut_set = {f"C1_{i}" for i in range(5)}
+    # cut_set = Graph.generate_random_cut(G)
+    cut_set = {f"C1_{i}" for i in range(5)}
     d = 4
 elif type_of_graph == "Random Graph":
     G, pos = Graph.create_random_d_regular_graph()
@@ -57,7 +57,7 @@ for sim in range(num_simulations):
     strain, conductance, cut_edges = Calc_updated.cut_metrics(
         current_G, cut_set, d)
     expected_strain = Calc_updated.expected_cut_strain_exact(
-        current_G, cut_set, d)
+        current_G, cut_set, d, strain)
     cut_strains.append(strain)
     expected_cut_strains.append(expected_strain)
     cut_sizes.append(len(cut_edges))
@@ -72,7 +72,7 @@ for sim in range(num_simulations):
         strain, conductance, cut_edges = Calc_updated.cut_metrics(
             current_G, cut_set, d)
         expected_strain = Calc_updated.expected_cut_strain_exact(
-            current_G, cut_set, d)
+            current_G, cut_set, d, strain)
         cut_strains.append(strain)
         expected_cut_strains.append(expected_strain)
         cut_sizes.append(len(cut_edges))
