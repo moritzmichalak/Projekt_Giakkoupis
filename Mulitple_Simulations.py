@@ -12,7 +12,7 @@ index_of_graph = int(input()) - 1
 list_of_graphs = ["Ring of Cliques", "Random Graph", "Ring", "Torus"]
 type_of_graph = list_of_graphs[index_of_graph]
 # Einstellungen
-#type_of_graph = "ring_of_cliques"  # {ring_of_cliques, random, ring}
+# type_of_graph = "ring_of_cliques"  # {ring_of_cliques, random, ring}
 num_simulations = 30
 max_flips = 1000  # Optional: Begrenzung für Simulationen (zum Testen)
 
@@ -37,6 +37,7 @@ n = len(G.nodes)
 if d > (math.log2(n)**2):
     raise ValueError("d ist zu groß für die Knotenzahl")
 
+real_upper_bound = int(n * d * (math.log2(n))**2)
 upper_bound = min(int(n * d * (math.log2(n))**2), max_flips)
 
 # Arrays für Simulationsergebnisse
@@ -107,7 +108,16 @@ plt.figure(figsize=(8, 6))
 node_colors = ["yellow" if n in cut_set else "lightblue" for n in G.nodes()]
 nx.draw(G, pos, with_labels=True, node_color=node_colors,
         node_size=500, font_size=10)
-plt.title("Anfangsgraph mit Cut")
+initial_conductance = all_conductances[0][0]
+initial_cut_size = all_cut_sizes[0][0]
+
+title_text = (
+    f"Nodes: {n} | d: {d} | Upper Bound: {upper_bound}\n"
+    f"Initial Cut Size: {initial_cut_size} | Initial Conductance: {initial_conductance:.4f}"
+)
+
+plt.suptitle(title_text)
+
 plt.show()
 
 # Plots anzeigen
@@ -145,7 +155,16 @@ axs[3].set_title("Conductance")
 axs[3].grid(True)
 
 plt.xlabel("Flip-Schritte")
-plt.tight_layout()
+fig.suptitle(
+    f"Simulationsergebnisse ({num_simulations} Läufe) – Graph: {type_of_graph}, d: {d}, Nodes: {n}, Upper Bound: {real_upper_bound}",
+    fontsize=14,
+    y=1.02
+)
+fig.tight_layout()
+fig.subplots_adjust(top=0.88)  # Platz für suptitle oben reservieren
+fig.suptitle(
+    f"Simulationsergebnisse ({num_simulations} Läufe)\nGraph: {type_of_graph}, d: {d}, Nodes: {n}, Max Flips: {upper_bound}",
+    fontsize=14
+)
+
 plt.show()
-
-
