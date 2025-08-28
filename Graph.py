@@ -96,6 +96,27 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
 
 def flip_operation(G):
     G = copy.deepcopy(G)
+    # 1. Choose an (ordered) pair of adjacent vertices a,b in V (this is the hub-edge)
+    a, b = random.choice(list(G.edges))
+    # 2. Choose a vertex a' in T(a) (possibly, a' = b)
+    a_prime = random.choice(list(set(G.neighbors(a))))
+    # 3. If the following two conditions hold: a' in T(a) \ T+(b) AND T(b) \ T+(a) not empty 
+    if (a_prime in list(set(G.neighbors(a)) - {b} - set(G.neighbors(b)))) and not (list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))) == []):
+        # 3.1. Choose a vertex b' in T(b) \ T+(a)
+        b_prime = random.choice(list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
+        # 3.2. Replace edges (a, a_prime), (b, b_prime) with (a, b_prime), (b, a_prime)
+
+        G.add_edge(a, b_prime)
+        G.add_edge(b, a_prime)
+        G.remove_edge(a, a_prime)
+        G.remove_edge(b, b_prime)
+        return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}
+    else:
+        return G, None, None
+
+"""
+def flip_operation(G):
+    G = copy.deepcopy(G)
     a, b = random.choice(list(G.edges))
     possible_c = list(set(G.neighbors(b)) - {a})
     if not possible_c:
@@ -113,7 +134,7 @@ def flip_operation(G):
     G.remove_edge(c, d)
 
     return G, {(a, b), (c, d)}, {(a, c), (b, d)}
-
+"""
 
 def generate_random_cut(G, seed=None):
     nodes = list(G.nodes())
