@@ -74,14 +74,16 @@ steps = np.arange(max_len)
 best_step = int(np.nanmin(expander_steps))
 avg_step = float(np.nanmean(expander_steps))
 worst_step = int(np.nanmax(expander_steps))
+min_expansion = np.nanmin(padded_expansions, axis=0)
+max_expansion = np.nanmax(padded_expansions, axis=0)
 
 # Plot
 plt.figure(figsize=(12, 6))
 plt.plot(steps, mean_expansion, color="black", label="Mean Expansion")
 plt.fill_between(
     steps,
-    mean_expansion - std_expansion,
-    mean_expansion + std_expansion,
+    min_expansion,
+    max_expansion,
     color="skyblue",
     alpha=0.5,
     label="Range of expansion",
