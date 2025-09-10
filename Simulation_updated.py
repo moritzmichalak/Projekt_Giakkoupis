@@ -23,7 +23,7 @@ if type_of_graph == "Ring of Cliques":
     G, pos = Graph.create_ring_of_cliques(5, 5)
     # cut_set = Graph.generate_random_cut(G)
     # smallest cut:
-    #cut_set = {f"C1_{i}" for i in range(5)}
+    # cut_set = {f"C1_{i}" for i in range(5)}
     # biggest cut: 
     cut_set = {"C2_2","C2_3", "C2_4", "C3_0", "C3_4", "C3_3", "C4_1", "C4_0", "C4_4", "C0_2", "C0_1", "C0_0", "C1_3", "C1_2", "C1_1"}
 
@@ -45,13 +45,15 @@ if d > (math.log2(n)**2):
     raise ValueError("Ungültiger Graph-Typ")
 else:
     # Obergrenze berechnen n⋅d⋅(log(n)^2)
-    upper_bound = 50
+    upper_bound = 200
     # upper_bound = int(n * d * (math.log2(n))**2) 
 
     # Initialisieren:
     graphs = [copy.deepcopy(G)]
     cut_strains = []
     expected_cut_strains = []
+    #03.09.25
+    expected_strains_alternative = []
     #cheeger_constants = []
     cut_sizes = []
     conductances = []
@@ -62,10 +64,14 @@ else:
     strain, conductance, cut_edges = Calc_updated.cut_metrics(G, cut_set, d)
     cut_size = len(cut_edges)
     expected_strain = Calc_updated.expected_cut_strain_exact(G, cut_set, d, strain)
+    #03.09.25
+    expected_strain_alternative = Calc_updated.calculate_expected_cut_strain_alternative(G, cut_set, d, strain)
 
     # strain, conductance, cut_edges = Calc_updated.cut_metrics(G, cut_set, d)
     cut_strains.append(strain)
     expected_cut_strains.append(expected_strain)
+    #03.09.25
+    expected_strains_alternative.append(expected_strain_alternative)
     cut_sizes.append(cut_size)
     conductances.append(conductance)
     # cheeger_constants.append(cut_size)
@@ -82,10 +88,14 @@ else:
         graphs.append(copy.deepcopy(current_G))
         strain, conductance, cut_edges = Calc_updated.cut_metrics(current_G, cut_set, d)
         expected_strain = Calc_updated.expected_cut_strain_exact(current_G, cut_set, d, strain)
+        #03.09.25
+        expected_strain_alternative = Calc_updated.calculate_expected_cut_strain_alternative(current_G, cut_set, d, strain)
         cut_size = len(cut_edges)
 
         cut_strains.append(strain)
         expected_cut_strains.append(expected_strain)
+        #03.09.25
+        expected_strains_alternative.append(expected_strain_alternative)
         cut_sizes.append(cut_size)
         conductances.append(conductance)
         cut_edges_list.append(cut_edges)
@@ -140,6 +150,13 @@ else:
         label="Expected Cut Strain (nach Flip)",
         color='purple'
         )
+        # 03.09.25 Expected Strain Alternative
+        ax_strain.plot(
+        range(1, len(expected_strains_alternative)),
+        expected_strains_alternative[:-1],
+        label="Expected Cut Strain Alternative (nach Flip)",
+        color='green'
+        )
         ax_strain.axvline(index, color='gray', linestyle='--')
         ax_strain.axvline(upper_bound, color='red', linestyle=':', label='Upper Bound')
         ax_strain.set_ylabel("Strain")
@@ -193,7 +210,8 @@ else:
         if index == 0:
             ecs_display = "N/A"  # Keine ECS vor der ersten Flip-Operation
         else:
-            ecs_display = f"{expected_cut_strains[index - 1]:.3f}"
+            # ecs_display = f"{expected_cut_strains[index - 1]:.3f}"
+            ecs_display = f"expected_strain: {expected_cut_strains[index - 1]:.3f}, alternative: {expected_strains_alternative[index - 1]:.3f}"
 
         ax_graph.set_title(
             f"Flip-Schritt {index}: \n"
