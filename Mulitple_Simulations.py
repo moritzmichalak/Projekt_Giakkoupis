@@ -1,170 +1,101 @@
-import networkx as nx
-import matplotlib.pyplot as plt
 import copy
 import math
 import numpy as np
+import matplotlib.pyplot as plt
+
 import Graph
 import Calc_updated
+
 
 # Auswahl Graph durch User
 print("Choose: 1 = Ring of Cliques ; 2 = Random Graph ; 3 = Ring ; 4 = Torus")
 index_of_graph = int(input()) - 1
 list_of_graphs = ["Ring of Cliques", "Random Graph", "Ring", "Torus"]
 type_of_graph = list_of_graphs[index_of_graph]
+
 # Einstellungen
-# type_of_graph = "ring_of_cliques"  # {ring_of_cliques, random, ring}
 num_simulations = 30
-max_flips = 1000  # Optional: Begrenzung für Simulationen (zum Testen)
+max_flips = 10000  # Optional: Begrenzung für Simulationen
+expansion_threshold = 0.5  # Abbruch, sobald spektrale Lücke diesen Wert erreicht
 
 # Graph initialisieren
 if type_of_graph == "Ring of Cliques":
     G, pos = Graph.create_ring_of_cliques(5, 5)
-    # cut_set = Graph.generate_random_cut(G)
-    cut_set = {f"C1_{i}" for i in range(5)}
     d = 4
 elif type_of_graph == "Random Graph":
     G, pos = Graph.create_random_d_regular_graph()
-    cut_set = Graph.generate_random_cut(G)
     d = Calc_updated.calculate_d(G)
 elif type_of_graph == "Ring":
     G, pos, n = Graph.create_random_even_cycle_graph(seed=42)
     d = 2
-    cut_set = Graph.generate_random_cut(G)
 else:
     raise ValueError("Ungültiger Graph-Typ")
 
 n = len(G.nodes)
-if d > (math.log2(n)**2):
+if d > (math.log2(n) ** 2):
     raise ValueError("d ist zu groß für die Knotenzahl")
 
-real_upper_bound = int(n * d * (math.log2(n))**2)
-upper_bound = min(int(n * d * (math.log2(n))**2), max_flips)
+real_upper_bound = int(n * d * (math.log2(n)) ** 2)
+upper_bound = min(real_upper_bound, max_flips)
 
-# Arrays für Simulationsergebnisse
-all_cut_strains = []
-all_expected_cut_strains = []
-all_cut_sizes = []
-all_conductances = []
+all_expansions = []
+expander_steps = []
 
 # Mehrfache Simulationen
 for sim in range(num_simulations):
     current_G = copy.deepcopy(G)
-    cut_strains = []
-    expected_cut_strains = []
-    cut_sizes = []
-    conductances = []
-
-    strain, conductance, cut_edges = Calc_updated.cut_metrics(
-        current_G, cut_set, d)
-    expected_strain = Calc_updated.expected_cut_strain_exact(
-        current_G, cut_set, d, strain)
-    cut_strains.append(strain)
-    expected_cut_strains.append(expected_strain)
-    cut_sizes.append(len(cut_edges))
-    conductances.append(conductance)
-
+    expansions = []
+    expansion = Calc_updated.spectral_expansion(current_G)
+    expansions.append(expansion)
     flips_done = 0
-    while flips_done < upper_bound:
+
+    while expansion < expansion_threshold and flips_done < upper_bound:
         new_G, removed, added = Graph.flip_operation(current_G)
         if removed is None or added is None:
             continue
         current_G = new_G
-        strain, conductance, cut_edges = Calc_updated.cut_metrics(
-            current_G, cut_set, d)
-        expected_strain = Calc_updated.expected_cut_strain_exact(
-            current_G, cut_set, d, strain)
-        cut_strains.append(strain)
-        expected_cut_strains.append(expected_strain)
-        cut_sizes.append(len(cut_edges))
-        conductances.append(conductance)
         flips_done += 1
+        expansion = Calc_updated.spectral_expansion(current_G)
+        expansions.append(expansion)
 
-    all_cut_strains.append(cut_strains)
-    all_expected_cut_strains.append(expected_cut_strains)
-    all_cut_sizes.append(cut_sizes)
-    all_conductances.append(conductances)
+    all_expansions.append(expansions)
+    expander_steps.append(flips_done if expansion >=
+                          expansion_threshold else np.nan)
 
-# In Arrays konvertieren
-cut_strains_np = np.array(all_cut_strains)
-expected_strains_np = np.array(all_expected_cut_strains)
-cut_sizes_np = np.array(all_cut_sizes)
-conductances_np = np.array(all_conductances)
-
-# Durchschnittswerte berechnen
-mean_cut_strain = np.mean(cut_strains_np, axis=0)
-std_cut_strain = np.std(cut_strains_np, axis=0)
-
-mean_expected_strain = np.mean(expected_strains_np, axis=0)
-std_expected_strain = np.std(expected_strains_np, axis=0)
-
-mean_cut_size = np.mean(cut_sizes_np, axis=0)
-std_cut_size = np.std(cut_sizes_np, axis=0)
-
-mean_conductance = np.mean(conductances_np, axis=0)
-std_conductance = np.std(conductances_np, axis=0)
-
-# Anfangsgraph mit Cut anzeigen
-plt.figure(figsize=(8, 6))
-node_colors = ["yellow" if n in cut_set else "lightblue" for n in G.nodes()]
-nx.draw(G, pos, with_labels=True, node_color=node_colors,
-        node_size=500, font_size=10)
-initial_conductance = all_conductances[0][0]
-initial_cut_size = all_cut_sizes[0][0]
-
-title_text = (
-    f"Nodes: {n} | d: {d} | Upper Bound: {upper_bound}\n"
-    f"Initial Cut Size: {initial_cut_size} | Initial Conductance: {initial_conductance:.4f}"
+# Daten für den Plot vorbereiten
+max_len = max(len(exp) for exp in all_expansions)
+padded_expansions = np.array(
+    [exp + [np.nan] * (max_len - len(exp)) for exp in all_expansions]
 )
+mean_expansion = np.nanmean(padded_expansions, axis=0)
+std_expansion = np.nanstd(padded_expansions, axis=0)
+steps = np.arange(max_len)
 
-plt.suptitle(title_text)
+best_step = int(np.nanmin(expander_steps))
+avg_step = float(np.nanmean(expander_steps))
+worst_step = int(np.nanmax(expander_steps))
+min_expansion = np.nanmin(padded_expansions, axis=0)
+max_expansion = np.nanmax(padded_expansions, axis=0)
 
-plt.show()
-
-# Plots anzeigen
-fig, axs = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
-steps = range(len(mean_cut_strain))
-
-axs[0].plot(steps, mean_cut_size, label="Avg Cut Size", color="orange")
-axs[0].fill_between(steps, mean_cut_size - std_cut_size,
-                    mean_cut_size + std_cut_size, color="orange", alpha=0.3)
-
-axs[0].legend()
-axs[0].set_title("Durchschnittliche Cut Size")
-axs[0].grid(True)
-
-axs[1].plot(steps, mean_cut_strain, label="Avg Cut Strain", color="blue")
-axs[1].fill_between(steps, mean_cut_strain - std_cut_strain,
-                    mean_cut_strain + std_cut_strain, color="blue", alpha=0.3)
-axs[1].legend()
-axs[1].set_title("Durchschnittliche Cut Strain")
-axs[1].grid(True)
-
-axs[2].plot(steps, mean_expected_strain,
-            label="Avg Expected Strain", color="purple")
-axs[2].fill_between(steps, mean_expected_strain - std_expected_strain,
-                    mean_expected_strain + std_expected_strain, color="purple", alpha=0.3)
-axs[2].legend()
-axs[2].set_title("Durchschnittliche Erwartete Cut Strain")
-axs[2].grid(True)
-
-axs[3].plot(steps, mean_conductance, label="Avg Conductance", color="green")
-axs[3].fill_between(steps, mean_conductance - std_conductance,
-                    mean_conductance + std_conductance, color="green", alpha=0.3)
-axs[3].legend()
-axs[3].set_title("Conductance")
-axs[3].grid(True)
-
-plt.xlabel("Flip-Schritte")
-fig.suptitle(
-    f"Simulationsergebnisse ({num_simulations} Läufe) – Graph: {type_of_graph}, d: {d}, Nodes: {n}, Upper Bound: {real_upper_bound}",
-    fontsize=14,
-    y=1.02
+# Plot
+plt.figure(figsize=(12, 6))
+plt.plot(steps, mean_expansion, color="black", label="Mean Expansion")
+plt.fill_between(
+    steps,
+    min_expansion,
+    max_expansion,
+    color="skyblue",
+    alpha=0.5,
+    label="Range of expansion",
 )
-fig.tight_layout()
-fig.subplots_adjust(top=0.88)  # Platz für suptitle oben reservieren
-fig.suptitle(
-    f"Simulationsergebnisse ({num_simulations} Läufe)\nGraph: {type_of_graph}, d: {d}, Nodes: {n}, Max Flips: {upper_bound}",
-    fontsize=14
+plt.axvline(best_step, color="green", linestyle="--", label="Best case")
+plt.axvline(avg_step, color="black", linestyle="--", label="Average case")
+plt.axvline(worst_step, color="red", linestyle="--", label="Worst case")
+plt.xlabel("Number of Flip-Operations")
+plt.ylabel("Expansion")
+plt.title(
+    f"Expansion über Flips – Graph: {type_of_graph}, d: {d}, Nodes: {n}, Max Flips: {upper_bound}"
 )
-
+plt.legend()
+plt.grid(True)
 plt.show()

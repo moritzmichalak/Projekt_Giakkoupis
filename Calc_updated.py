@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
+
 def cut_metrics(G, S, d):
     # iter(G.nodes) erzeugt einen Iterator über die Knoten des Graphen ; next(iter(...)) holt sich ersten Knoten aus diesem Iterator ; G.degree[node] gibt Grad (also die Anzahl der Nachbarn/Kanten) dieses Knotens zurück.
     # d = G.degree[next(iter(G.nodes))]
@@ -27,7 +28,8 @@ def cut_metrics(G, S, d):
         strain += alpha_u * (1 - alpha_u)
 
     return strain, conductance, cut_edges
-    #return strain, cut_edges
+    # return strain, cut_edges
+
 
 def calculate_d(G):
     d = next(iter(dict(G.degree()).values()))
@@ -165,6 +167,27 @@ def expected_cut_strain_exact(G, S, d, strain):
         sum_diff_squared += diff ** 2
         sum_gamma += gamma(u, v)
 
-    expected = strain + (4 * delta / m) * sum_diff_squared - (delta ** 2 / m) * sum_gamma
+    expected = strain + (4 * delta / m) * sum_diff_squared - \
+        (delta ** 2 / m) * sum_gamma
     return expected
 
+
+def spectral_expansion(G):
+    """Berechnet die spektrale Expansion eines d-regulären Graphen.
+
+    Für einen d-regulären Graphen ist der größte Eigenwert der Adjazenzmatrix
+    gleich ``d``. Die Expansion wird als ``d - lambda_2`` definiert, wobei
+    ``lambda_2`` der zweitgrößte Eigenwert ist.
+
+    Args:
+        G: Ein ungerichteter d-regulärer NetworkX-Graph.
+
+    Returns:
+        float: Die spektrale Lücke ``d - lambda_2``.
+    """
+
+    A = xn.to_numpy_array(G)
+    eigenvalues = np.linalg.eigvalsh(A)
+    d = eigenvalues[-1]
+    lambda2 = eigenvalues[-2]
+    return d - lambda2
