@@ -20,14 +20,14 @@ max_flips = 1000  # Optional: Begrenzung für Simulationen (zum Testen)
 
 # Graph initialisieren
 if type_of_graph == "Ring of Cliques":
-    G, pos = Graph.create_ring_of_cliques(5, 5)
+    G, pos = Graph.create_ring_of_cliques(6, 5)
     # cut_set = Graph.generate_random_cut(G)
     # smallest cut:
-    # cut_set = {f"C1_{i}" for i in range(5)}
+    cut_set = {f"1_{i}" for i in range(5)}
     # biggest cut:
-    cut_set = {"C2_2", "C2_3", "C2_4", "C3_0", "C3_4", "C3_3", "C4_1",
-               "C4_0", "C4_4", "C0_2", "C0_1", "C0_0", "C1_3", "C1_2", "C1_1"}
-
+    
+    # cut_set = {"2_2", "2_3", "2_4", "3_0", "3_4", "3_3", "4_1", "4_0", "4_4", "0_2", "0_1", "0_0", "1_3", "1_2", "1_1"}
+    
     d = 4
 elif type_of_graph == "Random Graph":
     G, pos = Graph.create_random_d_regular_graph()
