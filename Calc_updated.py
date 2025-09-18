@@ -116,22 +116,70 @@ def expected_cut_strain_exact(G, S, d, strain):
     return expected
 
 
-def spectral_expansion(G):
-    """Berechnet die spektrale Expansion eines d-regulären Graphen.
-
-    Für einen d-regulären Graphen ist der größte Eigenwert der Adjazenzmatrix
-    gleich ``d``. Die Expansion wird als ``d - lambda_2`` definiert, wobei
-    ``lambda_2`` der zweitgrößte Eigenwert ist.
-
-    Args:
-        G: Ein ungerichteter d-regulärer NetworkX-Graph.
-
-    Returns:
-        float: Die spektrale Lücke ``d - lambda_2``.
+def spectral_gap_adjacency(G, d):
+    """Berechnet die unnormalisierte Spektrallücke: d - λ*.
+    λ* ist das Maximum des Betrags aller Eigenwerte außer d.
     """
+    A = xn.to_numpy_array(G, dtype=float)
+    vals = np.linalg.eigvalsh(A)          # symmetrisch, daher stabil
+    # größter Eigenwert außer d
+    lam_star = np.max(np.abs(vals[vals < d - 1e-12]))
+    gap = d - lam_star
+    return gap, lam_star
 
-    A = xn.to_numpy_array(G)
-    eigenvalues = np.linalg.eigvalsh(A)
-    d = eigenvalues[-1]
-    lambda2 = eigenvalues[-2]
-    return d - lambda2
+
+def spectral_gap_normalized(G, d):
+    """Berechnet die normalisierte Spektrallücke γ = λ₂(L),
+    wobei L = I - A/d die normalisierte Laplace-Matrix ist.
+    """
+    A = xn.to_numpy_array(G, dtype=float)
+    n = A.shape[0]
+    L = np.eye(n) - A / d
+    vals = np.linalg.eigvalsh(L)
+    gamma = vals[1]  # zweitkleinster Eigenwert
+    return gamma
+
+
+def is_expander(G, d, epsilon=0.1, criterion="normalized"):
+    """
+    Entscheidet ob G ein Expander ist.
+    criterion = "normalized": nutzt γ = λ₂(L)
+    criterion = "adjacency": nutzt (d - λ*)/d
+    """
+    if criterion == "normalized":
+        gamma = spectral_gap_normalized(G, d)
+        return gamma >= epsilon, {"gamma": float(gamma), "epsilon": float(epsilon)}
+    elif criterion == "adjacency":
+        gap, lam_star = spectral_gap_adjacency(G, d)
+        rel = gap / d
+        return rel >= epsilon, {"gap": float(gap), "relative": float(rel),
+                                "lam_star": float(lam_star), "epsilon": float(epsilon)}
+    else:
+        raise ValueError('criterion muss "normalized" oder "adjacency" sein')
+
+
+def spectral_gamma(G, d):
+    A = xn.to_numpy_array(G, dtype=float)
+    n = A.shape[0]
+    L = np.eye(n) - A / d
+    vals = np.linalg.eigvalsh(L)
+    return float(vals[1])
+
+
+def recommend_threshold_by_sampling(n, d, trials=50, quantile=0.60, seed=42):
+    rng = np.random.default_rng(seed)
+    gammas = []
+    for t in range(trials):
+        G = xn.random_regular_graph(d, n, seed=int(rng.integers(0, 1_000_000)))
+        gammas.append(spectral_gamma(G, d))
+    gammas = np.array(gammas, dtype=float)
+    thr = float(np.quantile(gammas, quantile))
+    stats = {
+        "median": float(np.median(gammas)),
+        "p25": float(np.quantile(gammas, 0.25)),
+        "p75": float(np.quantile(gammas, 0.75)),
+        "mean": float(np.mean(gammas)),
+        "std": float(np.std(gammas)),
+        "samples": int(trials)
+    }
+    return thr

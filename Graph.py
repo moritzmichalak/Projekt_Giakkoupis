@@ -7,25 +7,28 @@ import copy
 
 
 def create_random_d_regular_graph(seed=None):
-    n = random.randint(10, 30)
+    n = 40
     rng = random.Random(seed)
     possible_d = [d for d in range(3, n // 2 + 1) if (n * d) % 2 == 0]
-    d = rng.choice(possible_d)
+    d = 6
     # d = random.randint(2, n/2)
     G = nx.random_regular_graph(d, n, seed=seed)
     pos = nx.spring_layout(G, seed=42)  # feste Knotenpositionen
     return G, pos
 
+
 def create_random_even_cycle_graph(seed=None):
     # d = 2
-    min_n, max_n = 8, 30 
+    min_n, max_n = 8, 30
     rng = random.Random(seed)
-    #Da d = 2 und d * n gerade sein muss, wähle n gerade: 
+    # Da d = 2 und d * n gerade sein muss, wähle n gerade:
     possible_n = [num for num in range(min_n, max_n + 1) if num % 2 == 0]
     n = rng.choice(possible_n)
     G = nx.cycle_graph(n)
     pos = nx.circular_layout(G)  # Fixiertes Kreis-Layout
     return G, pos, n
+
+
 '''
 def create_torus():
     # Breite und Höhe des Torus-Gitters (m × n)
@@ -47,6 +50,8 @@ def create_torus():
     plt.title(f"4-regulärer Torus: {b}×{a}")
     return G, pos, n
 '''
+
+
 def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
     num_cliques = p_num_cliques
     clique_size = p_clique_size
@@ -100,10 +105,11 @@ def flip_operation(G):
     a, b = random.choice(list(G.edges))
     # 2. Choose a vertex a' in T(a) (possibly, a' = b)
     a_prime = random.choice(list(set(G.neighbors(a))))
-    # 3. If the following two conditions hold: a' in T(a) \ T+(b) AND T(b) \ T+(a) not empty 
+    # 3. If the following two conditions hold: a' in T(a) \ T+(b) AND T(b) \ T+(a) not empty
     if (a_prime in list(set(G.neighbors(a)) - {b} - set(G.neighbors(b)))) and not (list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))) == []):
         # 3.1. Choose a vertex b' in T(b) \ T+(a)
-        b_prime = random.choice(list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
+        b_prime = random.choice(
+            list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
         # 3.2. Replace edges (a, a_prime), (b, b_prime) with (a, b_prime), (b, a_prime)
 
         G.add_edge(a, b_prime)
@@ -113,6 +119,7 @@ def flip_operation(G):
         return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}
     else:
         return G, None, None
+
 
 """
 def flip_operation(G):
@@ -135,6 +142,7 @@ def flip_operation(G):
 
     return G, {(a, b), (c, d)}, {(a, c), (b, d)}
 """
+
 
 def generate_random_cut(G, seed=None):
     nodes = list(G.nodes())
