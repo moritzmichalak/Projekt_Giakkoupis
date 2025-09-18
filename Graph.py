@@ -51,10 +51,66 @@ def create_torus():
     return G, pos, n
 '''
 
+# 11.09.25 Ring Of Cliques belieber Größe erstellen
+
 
 def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
     num_cliques = p_num_cliques
     clique_size = p_clique_size
+    d = clique_size - 1
+    G = nx.Graph()
+    cliques = []
+    edges_to_remove = []
+    edges_to_add = []
+    for i in range(num_cliques):
+        nodes = []
+        for j in range(clique_size):
+            nodes.append(f"{i}_{j}")
+            # print("node added: ", f"{i}_{j}")
+        cliques.append(nodes)
+        # Add one edge for each pair of nodes so that clique is completely connected.
+        # gets all pairs of nodes
+        for u, v in itertools.combinations(nodes, 2):
+            G.add_edge(u, v)
+        # Collect for each clique i the edge ("i_0", "i_1") to be removed.
+        edges_to_remove.append((f"{i}_{0}", f"{i}_{4}"))
+    # print("cliques: ", cliques)
+    # print("edges to remove: ", edges_to_remove)
+    pos = {}
+    angle_step = 2 * np.pi / num_cliques
+    for i, clique in enumerate(cliques):
+        angle = i * angle_step
+        center_x, center_y = np.cos(angle), np.sin(angle)
+        for j, node in enumerate(clique):
+            offset_x = 0.3 * np.cos(2 * np.pi * j / clique_size)
+            offset_y = 0.3 * np.sin(2 * np.pi * j / clique_size)
+            pos[node] = (center_x + offset_x, center_y + offset_y)
+
+    for i in range(num_cliques):
+        # print("number of cliques - 1: ", num_cliques - 1)
+        if i <= num_cliques - 2:
+            edges_to_add.append((f"{i}_{0}", f"{i+1}_{d}"))
+            # print("hinzugefügt: ", f"{i}_{0}", f"{i+1}_{d}")
+        else:
+            edges_to_add.append((f"{i}_{0}", f"{0}_{d}"))
+            # print("hinzugefügt: ", f"{i}_{0}", f"{0}_{d}")
+
+    for u, v in edges_to_remove:
+        if G.has_edge(u, v):
+            G.remove_edge(u, v)
+
+    for u, v in edges_to_add:
+        G.add_edge(u, v)
+    # print("nodes and edges:", G.nodes, G.edges)
+    return G, pos
+
+
+# Alte Version Ring of Cliques erstellen (statisch)
+"""
+def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
+    num_cliques = p_num_cliques
+    clique_size = p_clique_size
+    d = clique_size - 1
     G = nx.Graph()
     cliques = []
 
@@ -64,7 +120,7 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
         for u, v in itertools.combinations(nodes, 2):
             G.add_edge(u, v)
         cliques.append(nodes)
-
+    print("cliques:" , cliques)
     pos = {}
     angle_step = 2 * np.pi / num_cliques
     for i, clique in enumerate(cliques):
@@ -97,6 +153,7 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
         G.add_edge(u, v)
 
     return G, pos
+"""
 
 
 def flip_operation(G):
