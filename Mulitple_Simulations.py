@@ -46,9 +46,10 @@ criterion = "normalized"          # alternativ "adjacency"
 
 # Graph initialisieren
 if type_of_graph == "Ring of Cliques":
-    G, pos = Graph.create_ring_of_cliques(8, 5)
+    G, pos = Graph.create_ring_of_cliques(2000, 5)
     cut_set = {f"C1_{i}" for i in range(5)}     # nur noch fürs Zeichnen
     d = 4
+    print("Graph init")
 elif type_of_graph == "Random Graph":
     G, pos = Graph.create_random_d_regular_graph()
     cut_set = Graph.generate_random_cut(G)
@@ -66,15 +67,18 @@ if d > (math.log2(n) ** 2):
 
 real_upper_bound = int(n * d * (math.log2(n)) ** 2)
 upper_bound = min(int(n * d * (math.log2(n)) ** 2), max_flips)
+print("jetzt hier")
 epsilon = Calc_updated.recommend_threshold_by_sampling(n, d)
 print(epsilon)
 
 # Arrays für Simulationsergebnisse
 all_specs = []
 simulations = []  # speichert Daten jeder einzelnen Simulation
+sim_index = 1
 
 # Mehrfache Simulationen
 for sim in range(num_simulations):
+    print("Simulation ", sim_index, " of ", num_simulations)
     current_G = copy.deepcopy(G)
     graphs = [copy.deepcopy(current_G)]
     specvals = []
@@ -85,6 +89,8 @@ for sim in range(num_simulations):
 
     flips_done = 0
     while flips_done < upper_bound:
+        if flips_done % 1000 == 0:
+            print(flips_done, " flips of ", upper_bound)
         new_G, removed, added = Graph.flip_operation(current_G)
         if removed is None or added is None:
             continue
@@ -111,7 +117,8 @@ for i, c in enumerate(all_specs):
 
 # Durchschnittswerte berechnen
 mean_spec = np.nanmean(spec_np, axis=0)
-std_spec = np.nanstd(spec_np, axis=0)
+min_spec = np.nanmin(spec_np, axis=0)
+max_spec = np.nanmax(spec_np, axis=0)
 
 # Extremfälle bestimmen, basierend auf erstem Zeitpunkt, an dem der Threshold erreicht wird
 threshold = epsilon
@@ -226,16 +233,18 @@ def show_main_plot():
     best_case = simulations[best_index]["specvals"]
     worst_case = simulations[worst_index]["specvals"]
 
-    ax.plot(range(len(best_case)), best_case, label="Best Case", color="blue")
+    ax.plot(range(len(best_case)), best_case,
+            label="Best Case", color="green", linewidth=0.6)
     ax.plot(range(len(worst_case)), worst_case,
-            label="Worst Case", color="red")
-    ax.plot(steps, mean_spec, label="Avg Spectral", color="green")
+            label="Worst Case", color="red", linewidth=0.6)
+    ax.plot(steps, mean_spec, label="Avg Spectral",
+            color="blue", linewidth=0.8)
     ax.fill_between(
         steps,
-        mean_spec - std_spec,
-        mean_spec + std_spec,
-        color="green",
-        alpha=0.3,
+        min_spec,
+        max_spec,
+        color="lightblue",
+        alpha=0.6,
     )
     ax.axhline(threshold, color="gray", linestyle="--",
                label=f"Threshold {threshold}")

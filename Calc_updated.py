@@ -36,60 +36,76 @@ def calculate_d(G):
     return d
 
 # 28.08.25 / 03.09.25: Erwarteten Cut Strain-Wert durch überprüfen jeder Kante berechnen:
+
+
 def calculate_expected_cut_strain_alternative(G, S, d, strain):
     V = set(G.nodes)
     n = len(V)
     m = G.number_of_edges()
     expected_cut_strain_alternative = 0
     # cut_strain_scenario = strain
-    for a, b in G.edges: # number of iterations = m
-        for a_prime in set(G.neighbors(a)): # number of iterations = d
+    for a, b in G.edges:  # number of iterations = m
+        for a_prime in set(G.neighbors(a)):  # number of iterations = d
             # Does a' permit flip-operation?
             if (a_prime in list(set(G.neighbors(a)) - {b} - set(G.neighbors(b)))) and not (list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))) == []):
                 # a' permits flip-operation.
                 sum = 0
-                for b_prime in set(G.neighbors(b)) - {a} - set(G.neighbors(a)): # variable number of iterations.
+                # variable number of iterations.
+                for b_prime in set(G.neighbors(b)) - {a} - set(G.neighbors(a)):
                     cut_strain_scenario = strain
                     # The cut runs between a' und b' -> flip-operation changes cut strain.
                     if (a_prime in S) ^ (b_prime in S):
                         # print("(a,b) = ", a, b, "a' = ", a_prime, "b' = ", b_prime,)
-                        # Calculate old values: 
-                        alpha_a = len(set(G.neighbors(a)).intersection(S)) / len(set(G.neighbors(a)))
-                        alpha_b = len(set(G.neighbors(b)).intersection(S)) / len(set(G.neighbors(b)))
-                        alpha_a_prime = len(set(G.neighbors(a_prime)).intersection(S)) / len(set(G.neighbors(a_prime)))
-                        alpha_b_prime = len(set(G.neighbors(b_prime)).intersection(S)) / len(set(G.neighbors(b_prime)))
+                        # Calculate old values:
+                        alpha_a = len(set(G.neighbors(a)).intersection(
+                            S)) / len(set(G.neighbors(a)))
+                        alpha_b = len(set(G.neighbors(b)).intersection(
+                            S)) / len(set(G.neighbors(b)))
+                        alpha_a_prime = len(set(G.neighbors(a_prime)).intersection(
+                            S)) / len(set(G.neighbors(a_prime)))
+                        alpha_b_prime = len(set(G.neighbors(b_prime)).intersection(
+                            S)) / len(set(G.neighbors(b_prime)))
                         # print("alpha-Werte vorher: ", alpha_a, alpha_b, alpha_a_prime, alpha_b_prime)
                         # Substract old values:
-                        cut_strain_scenario -= (alpha_a * (1 - alpha_a) + alpha_b * (1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
-                        # Calculate new values: 
-                        if a_prime in S: # (a_prime  in S and b_prime not in S)
-                            alpha_a = (len(set(G.neighbors(a)).intersection(S)) - 1) / len(set(G.neighbors(a)))
-                            alpha_b = (len(set(G.neighbors(b)).intersection(S)) + 1) / len(set(G.neighbors(b)))
-                            alpha_a_prime = (len(set(G.neighbors(a_prime)).intersection(S)) - 1) / len(set(G.neighbors(a_prime)))
-                            alpha_b_prime = (len(set(G.neighbors(b_prime)).intersection(S)) + 1) / len(set(G.neighbors(b_prime)))
+                        cut_strain_scenario -= (alpha_a * (1 - alpha_a) + alpha_b * (
+                            1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
+                        # Calculate new values:
+                        if a_prime in S:  # (a_prime  in S and b_prime not in S)
+                            alpha_a = (len(set(G.neighbors(a)).intersection(
+                                S)) - 1) / len(set(G.neighbors(a)))
+                            alpha_b = (len(set(G.neighbors(b)).intersection(
+                                S)) + 1) / len(set(G.neighbors(b)))
+                            alpha_a_prime = (len(set(G.neighbors(a_prime)).intersection(
+                                S)) - 1) / len(set(G.neighbors(a_prime)))
+                            alpha_b_prime = (len(set(G.neighbors(b_prime)).intersection(
+                                S)) + 1) / len(set(G.neighbors(b_prime)))
                         else:  # (a_prime not in S and b_prime  in S)
-                            alpha_a = (len(set(G.neighbors(a)).intersection(S)) + 1) / len(set(G.neighbors(a)))
-                            alpha_b = (len(set(G.neighbors(b)).intersection(S)) - 1) / len(set(G.neighbors(b)))
-                            alpha_a_prime = (len(set(G.neighbors(a_prime)).intersection(S)) + 1) / len(set(G.neighbors(a_prime)))
-                            alpha_b_prime = (len(set(G.neighbors(b_prime)).intersection(S)) - 1) / len(set(G.neighbors(b_prime)))
-                        #print("alpha-Werte nachher: ", alpha_a, alpha_b, alpha_a_prime, alpha_b_prime)
+                            alpha_a = (len(set(G.neighbors(a)).intersection(
+                                S)) + 1) / len(set(G.neighbors(a)))
+                            alpha_b = (len(set(G.neighbors(b)).intersection(
+                                S)) - 1) / len(set(G.neighbors(b)))
+                            alpha_a_prime = (len(set(G.neighbors(a_prime)).intersection(
+                                S)) + 1) / len(set(G.neighbors(a_prime)))
+                            alpha_b_prime = (len(set(G.neighbors(b_prime)).intersection(
+                                S)) - 1) / len(set(G.neighbors(b_prime)))
+                        # print("alpha-Werte nachher: ", alpha_a, alpha_b, alpha_a_prime, alpha_b_prime)
                         # cut strain for specific 3-node-path : (a',a) - (a,b) - (b,b')
-                        cut_strain_scenario += (alpha_a * (1 - alpha_a) + alpha_b * (1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
-                        #print("Cut strain: ", strain,"Neu berechneter Cut strain: ", cut_strain_scenario)
-                    # sum of all cut strain over all possible b' 
+                        cut_strain_scenario += (alpha_a * (1 - alpha_a) + alpha_b * (
+                            1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
+                        # print("Cut strain: ", strain,"Neu berechneter Cut strain: ", cut_strain_scenario)
+                    # sum of all cut strain over all possible b'
                     sum += cut_strain_scenario
                 # weighted cut strain
-                averaged_new_strain = (sum / len(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
+                averaged_new_strain = (
+                    sum / len(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
                 # print("averaged_new_strain = ", averaged_new_strain)
-                expected_cut_strain_alternative += (averaged_new_strain / (m*d))
-            else: 
+                expected_cut_strain_alternative += (
+                    averaged_new_strain / (m*d))
+            else:
                 # a' does not permit flip-operation.
                 expected_cut_strain_alternative += (strain / (m*d))
-    # print("expected_cut_strain_alternative: ", expected_cut_strain_alternative)    
+    # print("expected_cut_strain_alternative: ", expected_cut_strain_alternative)
     return expected_cut_strain_alternative
-                                
-
-
 
 
 def expected_cut_strain_exact(G, S, d, strain):
@@ -222,10 +238,11 @@ def spectral_gamma(G, d):
     return float(vals[1])
 
 
-def recommend_threshold_by_sampling(n, d, trials=50, quantile=0.60, seed=42):
+def recommend_threshold_by_sampling(n, d, trials=10, quantile=0.60, seed=42):
     rng = np.random.default_rng(seed)
     gammas = []
     for t in range(trials):
+        print("Try ", t, " of ", trials)
         G = xn.random_regular_graph(d, n, seed=int(rng.integers(0, 1_000_000)))
         gammas.append(spectral_gamma(G, d))
     gammas = np.array(gammas, dtype=float)
