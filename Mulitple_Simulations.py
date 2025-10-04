@@ -39,14 +39,14 @@ list_of_graphs = ["Ring of Cliques", "Random Graph", "Ring", "Torus"]
 type_of_graph = list_of_graphs[index_of_graph]
 
 # Einstellungen
-num_simulations = 20
-max_flips = 20000
+num_simulations = 10
+max_flips = 300
 criterion = "normalized"          # alternativ "adjacency"
 # Schwellwert für Expander
 
 # Graph initialisieren
 if type_of_graph == "Ring of Cliques":
-    G, pos = Graph.create_ring_of_cliques(2000, 5)
+    G, pos = Graph.create_ring_of_cliques(25, 5)
     cut_set = {f"C1_{i}" for i in range(5)}     # nur noch fürs Zeichnen
     d = 4
     print("Graph init")
