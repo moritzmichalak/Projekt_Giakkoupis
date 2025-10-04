@@ -1,4 +1,4 @@
-import networkx as xn  # oder: import networkx as xn
+import networkx as xn 
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -59,19 +59,27 @@ def calculate_expected_cut_strain_alternative(G, S, d, strain):
                     if (a_prime in S) ^ (b_prime in S):
                         # print("(a,b) = ", a, b, "a' = ", a_prime, "b' = ", b_prime,)
                         # Calculate old values: 
-                        alpha_a = len(set(G.neighbors(a)).intersection(S)) / len(set(G.neighbors(a)))
-                        alpha_b = len(set(G.neighbors(b)).intersection(S)) / len(set(G.neighbors(b)))
-                        alpha_a_prime = len(set(G.neighbors(a_prime)).intersection(S)) / len(set(G.neighbors(a_prime)))
-                        alpha_b_prime = len(set(G.neighbors(b_prime)).intersection(S)) / len(set(G.neighbors(b_prime)))
+                        alpha_a = len(set(G.neighbors(a)).intersection(
+                            S)) / len(set(G.neighbors(a)))
+                        alpha_b = len(set(G.neighbors(b)).intersection(
+                            S)) / len(set(G.neighbors(b)))
+                        alpha_a_prime = len(set(G.neighbors(a_prime)).intersection(
+                            S)) / len(set(G.neighbors(a_prime)))
+                        alpha_b_prime = len(set(G.neighbors(b_prime)).intersection(
+                            S)) / len(set(G.neighbors(b_prime)))
                         # print("alpha-Werte vorher: ", alpha_a, alpha_b, alpha_a_prime, alpha_b_prime)
                         # Substract old values:
                         cut_strain_scenario -= (alpha_a * (1 - alpha_a) + alpha_b * (1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
                         # Calculate new values: 
                         if a_prime in S: # (a_prime  in S and b_prime not in S)
-                            alpha_a = (len(set(G.neighbors(a)).intersection(S)) - 1) / len(set(G.neighbors(a)))
-                            alpha_b = (len(set(G.neighbors(b)).intersection(S)) + 1) / len(set(G.neighbors(b)))
-                            alpha_a_prime = (len(set(G.neighbors(a_prime)).intersection(S)) - 1) / len(set(G.neighbors(a_prime)))
-                            alpha_b_prime = (len(set(G.neighbors(b_prime)).intersection(S)) + 1) / len(set(G.neighbors(b_prime)))
+                            alpha_a = (len(set(G.neighbors(a)).intersection(
+                                S)) - 1) / len(set(G.neighbors(a)))
+                            alpha_b = (len(set(G.neighbors(b)).intersection(
+                                S)) + 1) / len(set(G.neighbors(b)))
+                            alpha_a_prime = (len(set(G.neighbors(a_prime)).intersection(
+                                S)) - 1) / len(set(G.neighbors(a_prime)))
+                            alpha_b_prime = (len(set(G.neighbors(b_prime)).intersection(
+                                S)) + 1) / len(set(G.neighbors(b_prime)))
                         else:  # (a_prime not in S and b_prime  in S)
                             alpha_a = (len(set(G.neighbors(a)).intersection(S)) + 1) / len(set(G.neighbors(a)))
                             alpha_b = (len(set(G.neighbors(b)).intersection(S)) - 1) / len(set(G.neighbors(b)))
@@ -79,12 +87,13 @@ def calculate_expected_cut_strain_alternative(G, S, d, strain):
                             alpha_b_prime = (len(set(G.neighbors(b_prime)).intersection(S)) - 1) / len(set(G.neighbors(b_prime)))
                         #print("alpha-Werte nachher: ", alpha_a, alpha_b, alpha_a_prime, alpha_b_prime)
                         # cut strain for specific 3-node-path : (a',a) - (a,b) - (b,b')
-                        cut_strain_scenario += (alpha_a * (1 - alpha_a) + alpha_b * (1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
-                        #print("Cut strain: ", strain,"Neu berechneter Cut strain: ", cut_strain_scenario)
+                        cut_strain_scenario += (alpha_a * (1 - alpha_a) + alpha_b * (
+                            1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))                        #print("Cut strain: ", strain,"Neu berechneter Cut strain: ", cut_strain_scenario)
                     # sum of all cut strain over all possible b' 
                     sum += cut_strain_scenario
                 # weighted cut strain
-                averaged_new_strain = (sum / len(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
+                averaged_new_strain = (
+                    sum / len(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
                 # print("averaged_new_strain = ", averaged_new_strain)
                 expected_cut_strain_alternative += (averaged_new_strain / (m*d))
             else: 
@@ -173,71 +182,22 @@ def expected_cut_strain_exact(G, S, d, strain):
     return expected
 
 
-def spectral_gap_adjacency(G, d):
-    """Berechnet die unnormalisierte Spektrallücke: d - λ*.
-    λ* ist das Maximum des Betrags aller Eigenwerte außer d.
+def spectral_expansion(G):
+    """Berechnet die spektrale Expansion eines d-regulären Graphen.
+
+    Für einen d-regulären Graphen ist der größte Eigenwert der Adjazenzmatrix
+    gleich ``d``. Die Expansion wird als ``d - lambda_2`` definiert, wobei
+    ``lambda_2`` der zweitgrößte Eigenwert ist.
+
+    Args:
+        G: Ein ungerichteter d-regulärer NetworkX-Graph.
+
+    Returns:
+        float: Die spektrale Lücke ``d - lambda_2``.
     """
-    A = xn.to_numpy_array(G, dtype=float)
-    vals = np.linalg.eigvalsh(A)          # symmetrisch, daher stabil
-    # größter Eigenwert außer d
-    lam_star = np.max(np.abs(vals[vals < d - 1e-12]))
-    gap = d - lam_star
-    return gap, lam_star
 
-
-def spectral_gap_normalized(G, d):
-    """Berechnet die normalisierte Spektrallücke γ = λ₂(L),
-    wobei L = I - A/d die normalisierte Laplace-Matrix ist.
-    """
-    A = xn.to_numpy_array(G, dtype=float)
-    n = A.shape[0]
-    L = np.eye(n) - A / d
-    vals = np.linalg.eigvalsh(L)
-    gamma = vals[1]  # zweitkleinster Eigenwert
-    return gamma
-
-
-def is_expander(G, d, epsilon=0.1, criterion="normalized"):
-    """
-    Entscheidet ob G ein Expander ist.
-    criterion = "normalized": nutzt γ = λ₂(L)
-    criterion = "adjacency": nutzt (d - λ*)/d
-    """
-    if criterion == "normalized":
-        gamma = spectral_gap_normalized(G, d)
-        return gamma >= epsilon, {"gamma": float(gamma), "epsilon": float(epsilon)}
-    elif criterion == "adjacency":
-        gap, lam_star = spectral_gap_adjacency(G, d)
-        rel = gap / d
-        return rel >= epsilon, {"gap": float(gap), "relative": float(rel),
-                                "lam_star": float(lam_star), "epsilon": float(epsilon)}
-    else:
-        raise ValueError('criterion muss "normalized" oder "adjacency" sein')
-
-
-def spectral_gamma(G, d):
-    A = xn.to_numpy_array(G, dtype=float)
-    n = A.shape[0]
-    L = np.eye(n) - A / d
-    vals = np.linalg.eigvalsh(L)
-    return float(vals[1])
-
-
-def recommend_threshold_by_sampling(n, d, trials=10, quantile=0.60, seed=42):
-    rng = np.random.default_rng(seed)
-    gammas = []
-    for t in range(trials):
-        print("Try ", t, " of ", trials)
-        G = xn.random_regular_graph(d, n, seed=int(rng.integers(0, 1_000_000)))
-        gammas.append(spectral_gamma(G, d))
-    gammas = np.array(gammas, dtype=float)
-    thr = float(np.quantile(gammas, quantile))
-    stats = {
-        "median": float(np.median(gammas)),
-        "p25": float(np.quantile(gammas, 0.25)),
-        "p75": float(np.quantile(gammas, 0.75)),
-        "mean": float(np.mean(gammas)),
-        "std": float(np.std(gammas)),
-        "samples": int(trials)
-    }
-    return thr
+    A = xn.to_numpy_array(G)
+    eigenvalues = np.linalg.eigvalsh(A)
+    d = eigenvalues[-1]
+    lambda2 = eigenvalues[-2]
+    return d - lambda2
