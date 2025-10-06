@@ -2,6 +2,8 @@ import networkx as xn  # oder: import networkx as xn
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from joblib import Parallel, delayed
+from scipy.sparse.linalg import eigsh
 
 
 def cut_metrics(G, S, d):
@@ -238,14 +240,31 @@ def spectral_gamma(G, d):
     return float(vals[1])
 
 
-def recommend_threshold_by_sampling(n, d, trials=10, quantile=0.60, seed=42):
+# setzt epsilon durch berechnung der durchschnittlichen Spektrallücke bei randomsierten Graphen (--> Expander)
+def _spectral_gap_norm_laplacian_sparse(G):
+    # zwei kleinste Eigenwerte der normalisierten Laplace-Matrix
+    L = xn.normalized_laplacian_matrix(G)  # sparse
+    vals = eigsh(
+        L, k=2, which="SM", return_eigenvectors=False, tol=1e-4)
+    # vals ist aufsteigend sortiert, lambda_1 = 0, also Spektrallücke = lambda_2
+    return float(vals[1])
+
+
+def _one_trial(n, d, seed):
+    G = xn.random_regular_graph(d, n, seed=int(seed))
+    return _spectral_gap_norm_laplacian_sparse(G)
+
+
+def recommend_threshold_by_sampling(n, d, trials=10, quantile=0.60, seed=42, n_jobs=-1):
+    if n < 3:
+        raise ValueError(
+            "n muss mindestens 3 sein, damit k=2 bei eigsh funktioniert")
     rng = np.random.default_rng(seed)
-    gammas = []
-    for t in range(trials):
-        print("Try ", t, " of ", trials)
-        G = xn.random_regular_graph(d, n, seed=int(rng.integers(0, 1_000_000)))
-        gammas.append(spectral_gamma(G, d))
-    gammas = np.array(gammas, dtype=float)
+    seeds = rng.integers(0, 1_000_000, size=trials)
+    gammas = Parallel(n_jobs=n_jobs, prefer="threads")(
+        delayed(_one_trial)(n, d, s) for s in seeds
+    )
+    gammas = np.asarray(gammas, dtype=float)
     thr = float(np.quantile(gammas, quantile))
     stats = {
         "median": float(np.median(gammas)),
@@ -253,6 +272,6 @@ def recommend_threshold_by_sampling(n, d, trials=10, quantile=0.60, seed=42):
         "p75": float(np.quantile(gammas, 0.75)),
         "mean": float(np.mean(gammas)),
         "std": float(np.std(gammas)),
-        "samples": int(trials)
+        "samples": int(trials),
     }
-    return thr
+    return thr, stats

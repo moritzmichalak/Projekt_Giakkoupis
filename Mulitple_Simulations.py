@@ -7,30 +7,6 @@ from matplotlib.widgets import Button
 import Graph
 import Calc_updated
 
-# -------- Spektralmetrik --------
-
-
-def spectral_value(G, d, criterion="normalized"):
-    """
-    Liefert den Spektralwert für die Expanderentscheidung.
-    criterion gleich "normalized": γ gleich λ zwei von L, L gleich I minus A geteilt durch d
-    criterion gleich "adjacency": relative Lücke gleich (d minus λ Stern) geteilt durch d
-    """
-    A = nx.to_numpy_array(G, dtype=float)
-    if criterion == "normalized":
-        n = A.shape[0]
-        L = np.eye(n) - A / d
-        vals = np.linalg.eigvalsh(L)            # aufsteigend, λ eins gleich 0
-        return float(vals[1])
-    elif criterion == "adjacency":
-        vals = np.linalg.eigvalsh(A)            # aufsteigend
-        # größter Eigenwert ist d, λ Stern ist maximale Größe der übrigen
-        lam_star = np.max(np.abs(vals[:-1])) if len(vals) > 1 else 0.0
-        gap_rel = (d - lam_star) / d
-        return float(gap_rel)
-    else:
-        raise ValueError('criterion muss "normalized" oder "adjacency" sein')
-
 
 # Auswahl Graph durch User
 print("Choose: 1 = Ring of Cliques ; 2 = Random Graph ; 3 = Ring ; 4 = Torus")
@@ -41,7 +17,6 @@ type_of_graph = list_of_graphs[index_of_graph]
 # Einstellungen
 num_simulations = 20
 max_flips = 20000
-criterion = "normalized"          # alternativ "adjacency"
 # Schwellwert für Expander
 
 # Graph initialisieren
@@ -84,7 +59,7 @@ for sim in range(num_simulations):
     specvals = []
     flip_info = [(set(), set())]
 
-    spec = spectral_value(current_G, d, criterion=criterion)
+    spec = Calc_updated.spectral_gap_normalized(current_G, d)
     specvals.append(spec)
 
     flips_done = 0
@@ -96,7 +71,7 @@ for sim in range(num_simulations):
             continue
         current_G = new_G
         graphs.append(copy.deepcopy(current_G))
-        spec = spectral_value(current_G, d, criterion=criterion)
+        spec = Calc_updated.spectral_gap_normalized(current_G, d)
         specvals.append(spec)
         flip_info.append((removed, added))
         flips_done += 1
