@@ -260,7 +260,7 @@ def _spectral_gap_norm_laplacian_sparse(G):
 
 def _one_trial(n, d, seed):
     G = xn.random_regular_graph(d, n, seed=int(seed))
-    return _spectral_gap_norm_laplacian_sparse(G)
+    return spectral_gap_normalized(G, d)
 
 
 def recommend_threshold_by_sampling(n, d, trials=10, quantile=0.60, seed=42, n_jobs=-1):
@@ -282,4 +282,4 @@ def recommend_threshold_by_sampling(n, d, trials=10, quantile=0.60, seed=42, n_j
         "std": float(np.std(gammas)),
         "samples": int(trials),
     }
-    return thr, stats
+    return thr

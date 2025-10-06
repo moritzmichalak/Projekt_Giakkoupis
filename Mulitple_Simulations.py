@@ -32,16 +32,15 @@ def spectral_value(G, d, criterion="normalized"):
         raise ValueError('criterion muss "normalized" oder "adjacency" sein')
 
 
+"""
 # Auswahl Graph durch User
-print("Choose: 1 = Ring of Cliques ; 2 = Random Graph ; 3 = Ring ; 4 = Torus")
+print("Choose: 1 = Ring of Cliques ; 2 = Random Graph ; 3 = Ring")
 index_of_graph = int(input()) - 1
-list_of_graphs = ["Ring of Cliques", "Random Graph", "Ring", "Torus"]
+list_of_graphs = ["Ring of Cliques", "Random Graph", "Ring"]
 type_of_graph = list_of_graphs[index_of_graph]
 
 # Einstellungen
-num_simulations = 20
-max_flips = 20000
-criterion = "normalized"          # alternativ "adjacency"
+         # alternativ "adjacency"
 # Schwellwert für Expander
 
 # Graph initialisieren
@@ -63,6 +62,27 @@ else:
 n = len(G.nodes)
 if d > (math.log2(n) ** 2):
     raise ValueError("d ist zu groß für die Knotenzahl")
+
+"""
+
+print("Choose number of nodes:")
+n = int(input())
+possible_d = Calc_updated.calculate_possible_d(n)
+print("Choose degree from ", possible_d)
+chosen_d = int(input())
+for i in possible_d:
+    if chosen_d == i:
+        d = chosen_d
+number_of_cliques = int(n / (d+1))
+size_of_cliques = d+1
+print("You chose a graph with ", number_of_cliques,
+      " cliques, each with a size of", size_of_cliques, " nodes.")
+G, pos = Graph.create_ring_of_cliques(number_of_cliques, size_of_cliques)
+
+
+num_simulations = 20
+max_flips = 20000
+criterion = "normalized"
 
 real_upper_bound = int(n * d * (math.log2(n)) ** 2)
 upper_bound = min(int(n * d * (math.log2(n)) ** 2), max_flips)
@@ -246,7 +266,7 @@ def show_main_plot():
     ax.grid(True)
 
     fig.suptitle(
-        f"Simulationsergebnisse, {num_simulations} Läufe, Graph: {type_of_graph}, d: {d}, Nodes: {n}, Upper Bound: {real_upper_bound}",
+        f"Simulationsergebnisse, {num_simulations} Läufe, Graph: Ring of Cliques, d: {d}, Nodes: {n}, Upper Bound: {real_upper_bound}",
         fontsize=14,
         y=0.97,
     )
