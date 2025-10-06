@@ -1,4 +1,4 @@
-import networkx as xn  # oder: import networkx as xn
+import networkx as xn
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -7,8 +7,6 @@ from scipy.sparse.linalg import eigsh
 
 
 def cut_metrics(G, S, d):
-    # iter(G.nodes) erzeugt einen Iterator über die Knoten des Graphen ; next(iter(...)) holt sich ersten Knoten aus diesem Iterator ; G.degree[node] gibt Grad (also die Anzahl der Nachbarn/Kanten) dieses Knotens zurück.
-    # d = G.degree[next(iter(G.nodes))]
     V = set(G.nodes)
     cut_edges = set()
     for u in S:
@@ -30,13 +28,24 @@ def cut_metrics(G, S, d):
         strain += alpha_u * (1 - alpha_u)
 
     return strain, conductance, cut_edges
-    # return strain, cut_edges
+
+# Compute all possible regular degrees d > 2 for a graph with n nodes.
 
 
+def calculate_possible_d(n):
+    possible_d = []
+    for i in range(3, n):
+        ganzzahlig = (n/(i+1)) % 1
+        if ganzzahlig == 0:
+            possible_d.append(i)
+    return possible_d
+
+
+'''
 def calculate_d(G):
     d = next(iter(dict(G.degree()).values()))
     return d
-
+'''
 # 28.08.25 / 03.09.25: Erwarteten Cut Strain-Wert durch überprüfen jeder Kante berechnen:
 
 
@@ -93,8 +102,7 @@ def calculate_expected_cut_strain_alternative(G, S, d, strain):
                         # print("alpha-Werte nachher: ", alpha_a, alpha_b, alpha_a_prime, alpha_b_prime)
                         # cut strain for specific 3-node-path : (a',a) - (a,b) - (b,b')
                         cut_strain_scenario += (alpha_a * (1 - alpha_a) + alpha_b * (
-                            1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
-                        # print("Cut strain: ", strain,"Neu berechneter Cut strain: ", cut_strain_scenario)
+                            1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))  # print("Cut strain: ", strain,"Neu berechneter Cut strain: ", cut_strain_scenario)
                     # sum of all cut strain over all possible b'
                     sum += cut_strain_scenario
                 # weighted cut strain

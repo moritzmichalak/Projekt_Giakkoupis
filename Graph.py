@@ -5,55 +5,69 @@ import random
 import itertools
 import copy
 
-
 def create_random_d_regular_graph(seed=None):
-    n = 40
+    n = random.randint(10, 30)
     rng = random.Random(seed)
     possible_d = [d for d in range(3, n // 2 + 1) if (n * d) % 2 == 0]
-    d = 6
+    d = rng.choice(possible_d)
     # d = random.randint(2, n/2)
     G = nx.random_regular_graph(d, n, seed=seed)
     pos = nx.spring_layout(G, seed=42)  # feste Knotenpositionen
     return G, pos
 
-
 def create_random_even_cycle_graph(seed=None):
     # d = 2
-    min_n, max_n = 8, 30
+    min_n, max_n = 8, 30 
     rng = random.Random(seed)
-    # Da d = 2 und d * n gerade sein muss, wähle n gerade:
+    #Da d = 2 und d * n gerade sein muss, wähle n gerade: 
     possible_n = [num for num in range(min_n, max_n + 1) if num % 2 == 0]
     n = rng.choice(possible_n)
     G = nx.cycle_graph(n)
     pos = nx.circular_layout(G)  # Fixiertes Kreis-Layout
     return G, pos, n
 
+def generate_cut_1(G):
+    S_ = [] # hässlicher Code, zu optimieren
+    nodes = list(G.nodes)
+    for i in range(len(nodes)):
+        if int(nodes[i][0]) % 2 == 0:
+            S_.append(nodes[i])
+    S =  {S_[i] for i in range(len(S_))}
+    return S
 
-'''
-def create_torus():
-    # Breite und Höhe des Torus-Gitters (m × n)
-    a = 5  # Zeilen
-    b = 5  # Spalten
-    n = a * b
+def generate_cut_2(G, amount_cliques: int, p_clique_size: int):
+    S_ = [] # hässlicher Code, zu optimieren
+    nodes = list(G.nodes)
+    for i in range(amount_cliques*p_clique_size):
+        S_.append(nodes[i])
+    S =  {S_[i] for i in range(len(S_))}
+    return S
 
-    # Erstelle einen 2D-Torus (4-regulär)
-    G = nx.grid_2d_graph(b, a, periodic=True)
+# Maximum Cut Size:
+def generate_cut_3(G, amount_cliques: int, p_clique_size: int):
+    S_ = [] # hässlicher Code, zu optimieren
+    nodes = list(G.nodes)
+    nodes_clique_S = p_clique_size // 2
+    # Für jede Clique:
+    for i in range(amount_cliques):
+        # Füge drei Knoten zu S hinzu: 
+        for j in range(nodes_clique_S):
+            # print(f"{i}","I")
+            if j < (p_clique_size) :
+                S_.append(f"{i}_{(i+j) % (p_clique_size)}")
+                # print(f"{i}_{j}")
+    S =  {S_[i] for i in range(len(S_))}
+    return S
 
-    # Optional: Knoten als Strings umwandeln (statt (i,j)-Tupel)
-    #G = nx.convert_node_labels_to_integers(G)
+def generate_random_cut(G, seed=None):
+    nodes = list(G.nodes())
+    rng = random.Random(seed)
+    max_size = len(nodes) // 2
+    size = rng.randint(2, max_size)
+    S = set(rng.sample(nodes, size))
+    return S
 
-    # Layout
-    pos = nx.spring_layout(G, seed=42)
-
-    # Zeichnen
-    nx.draw(G, pos, with_labels=True, node_color="lightblue", node_size=500)
-    plt.title(f"4-regulärer Torus: {b}×{a}")
-    return G, pos, n
-'''
-
-# 11.09.25 Ring Of Cliques belieber Größe erstellen
-
-
+# Create a ring of cliques of any desired size.
 def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
     num_cliques = p_num_cliques
     clique_size = p_clique_size
@@ -66,16 +80,12 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
         nodes = []
         for j in range(clique_size):
             nodes.append(f"{i}_{j}")
-            # print("node added: ", f"{i}_{j}")
         cliques.append(nodes)
         # Add one edge for each pair of nodes so that clique is completely connected.
-        # gets all pairs of nodes
-        for u, v in itertools.combinations(nodes, 2):
-            G.add_edge(u, v)
+        for u, v in itertools.combinations(nodes, 2):  # gets all pairs of nodes
+            G.add_edge(u, v) 
         # Collect for each clique i the edge ("i_0", "i_1") to be removed.
-        edges_to_remove.append((f"{i}_{0}", f"{i}_{4}"))
-    # print("cliques: ", cliques)
-    # print("edges to remove: ", edges_to_remove)
+        edges_to_remove.append((f"{i}_{0}", f"{i}_{d}"))
     pos = {}
     angle_step = 2 * np.pi / num_cliques
     for i, clique in enumerate(cliques):
@@ -86,87 +96,29 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
             offset_y = 0.3 * np.sin(2 * np.pi * j / clique_size)
             pos[node] = (center_x + offset_x, center_y + offset_y)
 
-    for i in range(num_cliques):
-        # print("number of cliques - 1: ", num_cliques - 1)
+    for i in range(num_cliques):  
         if i <= num_cliques - 2:
             edges_to_add.append((f"{i}_{0}", f"{i+1}_{d}"))
-            # print("hinzugefügt: ", f"{i}_{0}", f"{i+1}_{d}")
         else:
-            edges_to_add.append((f"{i}_{0}", f"{0}_{d}"))
-            # print("hinzugefügt: ", f"{i}_{0}", f"{0}_{d}")
-
+            edges_to_add.append((f"{i}_{0}", f"{0}_{d}"))          
     for u, v in edges_to_remove:
         if G.has_edge(u, v):
             G.remove_edge(u, v)
-
     for u, v in edges_to_add:
         G.add_edge(u, v)
-    # print("nodes and edges:", G.nodes, G.edges)
-    return G, pos
+    return G, pos   
 
-
-# Alte Version Ring of Cliques erstellen (statisch)
-"""
-def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
-    num_cliques = p_num_cliques
-    clique_size = p_clique_size
-    d = clique_size - 1
-    G = nx.Graph()
-    cliques = []
-
-    for i in range(num_cliques):
-        nodes = [f"C{i}_{j}" for j in range(clique_size)]
-        G.add_nodes_from(nodes)
-        for u, v in itertools.combinations(nodes, 2):
-            G.add_edge(u, v)
-        cliques.append(nodes)
-    print("cliques:" , cliques)
-    pos = {}
-    angle_step = 2 * np.pi / num_cliques
-    for i, clique in enumerate(cliques):
-        angle = i * angle_step
-        center_x, center_y = np.cos(angle), np.sin(angle)
-        for j, node in enumerate(clique):
-            offset_x = 0.3 * np.cos(2 * np.pi * j / clique_size)
-            offset_y = 0.3 * np.sin(2 * np.pi * j / clique_size)
-            pos[node] = (center_x + offset_x, center_y + offset_y)
-
-    edges_to_remove = [
-        ("C2_4", "C2_0"),
-        ("C1_3", "C1_4"),
-        ("C0_2", "C0_3"),
-        ("C4_2", "C4_1"),
-        ("C3_1", "C3_0"),
-    ]
-    for u, v in edges_to_remove:
-        if G.has_edge(u, v):
-            G.remove_edge(u, v)
-
-    edges_to_add = [
-        ("C2_0", "C1_3"),
-        ("C1_4", "C0_2"),
-        ("C4_1", "C0_3"),
-        ("C3_0", "C4_2"),
-        ("C2_4", "C3_1"),
-    ]
-    for u, v in edges_to_add:
-        G.add_edge(u, v)
-
-    return G, pos
-"""
-
-
+# Flip operation according to Giakkoupis paper.
 def flip_operation(G):
     G = copy.deepcopy(G)
     # 1. Choose an (ordered) pair of adjacent vertices a,b in V (this is the hub-edge)
     a, b = random.choice(list(G.edges))
     # 2. Choose a vertex a' in T(a) (possibly, a' = b)
     a_prime = random.choice(list(set(G.neighbors(a))))
-    # 3. If the following two conditions hold: a' in T(a) \ T+(b) AND T(b) \ T+(a) not empty
+    # 3. If the following two conditions hold: a' in T(a) \ T+(b) AND T(b) \ T+(a) not empty 
     if (a_prime in list(set(G.neighbors(a)) - {b} - set(G.neighbors(b)))) and not (list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))) == []):
         # 3.1. Choose a vertex b' in T(b) \ T+(a)
-        b_prime = random.choice(
-            list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
+        b_prime = random.choice(list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
         # 3.2. Replace edges (a, a_prime), (b, b_prime) with (a, b_prime), (b, a_prime)
 
         G.add_edge(a, b_prime)
@@ -177,9 +129,8 @@ def flip_operation(G):
     else:
         return G, None, None
 
-
-"""
-def flip_operation(G):
+# Flip operation according to Schindelhauer/Mahlmann paper.
+def flip_operation_old(G):
     G = copy.deepcopy(G)
     a, b = random.choice(list(G.edges))
     possible_c = list(set(G.neighbors(b)) - {a})
@@ -198,13 +149,6 @@ def flip_operation(G):
     G.remove_edge(c, d)
 
     return G, {(a, b), (c, d)}, {(a, c), (b, d)}
-"""
 
 
-def generate_random_cut(G, seed=None):
-    nodes = list(G.nodes())
-    rng = random.Random(seed)
-    max_size = len(nodes) // 2
-    size = rng.randint(2, max_size)
-    S = set(rng.sample(nodes, size))
-    return S
+
