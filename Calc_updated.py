@@ -3,7 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 from joblib import Parallel, delayed
-from scipy.sparse.linalg import eigsh
+from scipy.sparse.linalg import eigsh, ArpackNoConvergence
+from scipy.sparse import identity
 
 
 def cut_metrics(G, S, d):
@@ -222,6 +223,32 @@ def spectral_gap_normalized(G, d):
     return gamma
 
 
+def spectral_gap_normalized_sparse(G, d, tol=1e-6, maxiter=5000, seed=0):
+    """
+    λ2 des normalisierten Laplacian L = I - A/d, schnell und speichersparend.
+    Gibt den gleichen Wert wie die dichte Variante, bis auf numerische Rundung.
+    """
+    try:
+        A = xn.to_scipy_sparse_array(G, dtype=float, format="csr")
+        # wir wollen die zwei größten Eigenwerte von A
+        vals = eigsh(
+            A,
+            k=2,
+            which="LA",
+            return_eigenvectors=False,
+            tol=tol,
+            maxiter=maxiter,
+        )
+        vals.sort()                      # [λ2(A), λ1(A) = d]
+        lam2_A = vals[-2]
+        return float(1.0 - lam2_A / float(d))
+    except ArpackNoConvergence:
+        A = xn.to_numpy_array(G, dtype=float)
+        L = np.eye(A.shape[0]) - A / float(d)
+        vals = np.linalg.eigvalsh(L)
+        return float(np.sort(vals)[1])
+
+
 def is_expander(G, d, epsilon=0.1, criterion="normalized"):
     """
     Entscheidet ob G ein Expander ist.
@@ -260,7 +287,7 @@ def _spectral_gap_norm_laplacian_sparse(G):
 
 def _one_trial(n, d, seed):
     G = xn.random_regular_graph(d, n, seed=int(seed))
-    return spectral_gap_normalized(G, d)
+    return spectral_gap_normalized_sparse(G, d)
 
 
 def recommend_threshold_by_sampling(n, d, trials=10, quantile=0.60, seed=42, n_jobs=-1):

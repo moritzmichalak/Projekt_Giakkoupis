@@ -81,7 +81,7 @@ G, pos = Graph.create_ring_of_cliques(number_of_cliques, size_of_cliques)
 
 
 num_simulations = 20
-max_flips = 20000
+max_flips = 5000
 criterion = "normalized"
 
 real_upper_bound = int(n * d * (math.log2(n)) ** 2)
@@ -95,12 +95,13 @@ simulations = []  # speichert Daten jeder einzelnen Simulation
 
 # Mehrfache Simulationen
 for sim in range(num_simulations):
+    print("Simulation ", sim+1, " of ", num_simulations)
     current_G = copy.deepcopy(G)
     graphs = [copy.deepcopy(current_G)]
     specvals = []
     flip_info = [(set(), set())]
 
-    spec = spectral_value(current_G, d, criterion=criterion)
+    spec = Calc_updated.spectral_gap_normalized_sparse(current_G, d)
     specvals.append(spec)
 
     flips_done = 0
@@ -110,10 +111,12 @@ for sim in range(num_simulations):
             continue
         current_G = new_G
         graphs.append(copy.deepcopy(current_G))
-        spec = spectral_value(current_G, d, criterion=criterion)
+        spec = Calc_updated.spectral_gap_normalized_sparse(current_G, d)
         specvals.append(spec)
         flip_info.append((removed, added))
         flips_done += 1
+        if (flips_done % 1000 == 0):
+            print(flips_done, "Flips done")
 
     simulations.append({
         "graphs": graphs,
