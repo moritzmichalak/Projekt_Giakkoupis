@@ -27,6 +27,15 @@ def create_random_even_cycle_graph(seed=None):
     return G, pos, n
 
 def generate_cut_1(G):
+    # Jede zweite Clique: wähle alle Knoten, deren Clique-ID (vor dem '_') gerade ist
+    S = set()
+    for node in G.nodes():
+        clique_id = int(str(node).split('_')[0])  # <-- korrektes Parsen
+        if clique_id % 2 == 0:
+            S.add(node)
+    return S
+'''
+def generate_cut_1(G):
     S_ = [] # hässlicher Code, zu optimieren
     nodes = list(G.nodes)
     for i in range(len(nodes)):
@@ -34,7 +43,7 @@ def generate_cut_1(G):
             S_.append(nodes[i])
     S =  {S_[i] for i in range(len(S_))}
     return S
-
+'''
 def generate_cut_2(G, amount_cliques: int, p_clique_size: int):
     S_ = [] # hässlicher Code, zu optimieren
     nodes = list(G.nodes)
