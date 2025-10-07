@@ -57,13 +57,25 @@ number_of_cliques = int(n / (d+1))
 size_of_cliques = d+1
 print("You chose a graph with ", number_of_cliques,
       " cliques, each with a size of", size_of_cliques, " nodes.")
+print("Draw graphs? y or n")
+draw = input()
+if draw == "y":
+    draw_graphs = True
+else:
+    draw_graphs = False
+print("Run all flips? y or n")
+flips = input()
+if flips == "y":
+    all_flips = True
+else:
+    all_flips = False
 G, pos = Graph.create_ring_of_cliques(number_of_cliques, size_of_cliques)
 
 SAMPLING_RATE_HIGH = math.ceil(n/50)      # alle 10 Flips Spektrum messen
 SAMPLING_RATE_LOW = math.ceil(n/5)
 
 num_simulations = 10
-max_flips = 500000
+# max_flips = 500000
 criterion = "normalized"
 
 real_upper_bound = int(n * d * (math.log2(n)) ** 2)
@@ -90,10 +102,7 @@ for sim in range(num_simulations):
 
     flips_done = 0
     while flips_done < upper_bound:
-        success, removed, added = Graph.flip_operation(current_G, nodes)
-        if not success:
-            continue
-        # graphs.append(copy.deepcopy(current_G))
+        current_G, removed, added = Graph.flip_operation(current_G)
         flip_info.append((removed, added))
         flips_done += 1
         # nur alle MEASURE_EVERY Flips messen
@@ -108,10 +117,11 @@ for sim in range(num_simulations):
                 spec = Calc_updated.spectral_gap_normalized_sparse(
                     current_G, d)
         specvals.append(float(spec) if np.isfinite(spec) else np.nan)
-        graphs.append(current_G.copy())
+        if draw_graphs:
+            graphs.append(current_G.copy())
         if flips_done % 1000 == 0:
             print((sim*upper_bound+flips_done) /
-                  (num_simulations*upper_bound)*100, "percent done")
+                  (num_simulations*upper_bound)*100, "percent done, high precision: ", high_prescision)
 
     simulations.append({
         # falls du Graphen nicht speichern willst

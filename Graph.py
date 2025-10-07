@@ -5,6 +5,7 @@ import random
 import itertools
 import copy
 
+
 def create_random_d_regular_graph(seed=None):
     n = random.randint(10, 30)
     rng = random.Random(seed)
@@ -15,16 +16,18 @@ def create_random_d_regular_graph(seed=None):
     pos = nx.spring_layout(G, seed=42)  # feste Knotenpositionen
     return G, pos
 
+
 def create_random_even_cycle_graph(seed=None):
     # d = 2
-    min_n, max_n = 8, 30 
+    min_n, max_n = 8, 30
     rng = random.Random(seed)
-    #Da d = 2 und d * n gerade sein muss, wähle n gerade: 
+    # Da d = 2 und d * n gerade sein muss, wähle n gerade:
     possible_n = [num for num in range(min_n, max_n + 1) if num % 2 == 0]
     n = rng.choice(possible_n)
     G = nx.cycle_graph(n)
     pos = nx.circular_layout(G)  # Fixiertes Kreis-Layout
     return G, pos, n
+
 
 def generate_cut_1(G):
     # Jede zweite Clique: wähle alle Knoten, deren Clique-ID (vor dem '_') gerade ist
@@ -34,6 +37,8 @@ def generate_cut_1(G):
         if clique_id % 2 == 0:
             S.add(node)
     return S
+
+
 '''
 def generate_cut_1(G):
     S_ = [] # hässlicher Code, zu optimieren
@@ -44,17 +49,21 @@ def generate_cut_1(G):
     S =  {S_[i] for i in range(len(S_))}
     return S
 '''
+
+
 def generate_cut_2(G, amount_cliques: int, p_clique_size: int):
-    S= set()
+    S = set()
     # S_ = [] # hässlicher Code, zu optimieren
     nodes = list(G.nodes)
     for i in range(amount_cliques*p_clique_size):
         S.add(nodes[i])
-        #S_.append(nodes[i])
+        # S_.append(nodes[i])
     # S =  {S_[i] for i in range(len(S_))}
     return S
 
 # Maximum Cut Size:
+
+
 def generate_cut_3(G, amount_cliques: int, p_clique_size: int):
     # S_ = [] # hässlicher Code, zu optimieren
     S = set()
@@ -62,15 +71,16 @@ def generate_cut_3(G, amount_cliques: int, p_clique_size: int):
     nodes_clique_S = p_clique_size // 2
     # Für jede Clique:
     for i in range(amount_cliques):
-        # Füge die Hälfte der Knoten zu S hinzu: 
+        # Füge die Hälfte der Knoten zu S hinzu:
         for j in range(nodes_clique_S):
             # print(f"{i}","I")
-            if j < (p_clique_size) :
+            if j < (p_clique_size):
                 # S_.append(f"{i}_{(i+j) % (p_clique_size)}")
                 S.add(f"{i}_{(i+j) % (p_clique_size)}")
                 # print(f"{i}_{j}")
-    #S =  {S_[i] for i in range(len(S_))}
+    # S =  {S_[i] for i in range(len(S_))}
     return S
+
 
 def generate_random_cut(G, seed=None):
     nodes = list(G.nodes())
@@ -81,6 +91,8 @@ def generate_random_cut(G, seed=None):
     return S
 
 # Create a ring of cliques of any desired size.
+
+
 def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
     num_cliques = p_num_cliques
     clique_size = p_clique_size
@@ -95,8 +107,9 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
             nodes.append(f"{i}_{j}")
         cliques.append(nodes)
         # Add one edge for each pair of nodes so that clique is completely connected.
-        for u, v in itertools.combinations(nodes, 2):  # gets all pairs of nodes
-            G.add_edge(u, v) 
+        # gets all pairs of nodes
+        for u, v in itertools.combinations(nodes, 2):
+            G.add_edge(u, v)
         # Collect for each clique i the edge ("i_0", "i_1") to be removed.
         edges_to_remove.append((f"{i}_{0}", f"{i}_{d}"))
     pos = {}
@@ -109,29 +122,31 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
             offset_y = 0.3 * np.sin(2 * np.pi * j / clique_size)
             pos[node] = (center_x + offset_x, center_y + offset_y)
 
-    for i in range(num_cliques):  
+    for i in range(num_cliques):
         if i <= num_cliques - 2:
             edges_to_add.append((f"{i}_{0}", f"{i+1}_{d}"))
         else:
-            edges_to_add.append((f"{i}_{0}", f"{0}_{d}"))          
+            edges_to_add.append((f"{i}_{0}", f"{0}_{d}"))
     for u, v in edges_to_remove:
         if G.has_edge(u, v):
             G.remove_edge(u, v)
     for u, v in edges_to_add:
         G.add_edge(u, v)
-    return G, pos   
+    return G, pos
 
 # Flip operation according to Giakkoupis paper.
+
+
 def flip_operation(G):
-    G = copy.deepcopy(G)
     # 1. Choose an (ordered) pair of adjacent vertices a,b in V (this is the hub-edge)
     a, b = random.choice(list(G.edges))
     # 2. Choose a vertex a' in T(a) (possibly, a' = b)
     a_prime = random.choice(list(set(G.neighbors(a))))
-    # 3. If the following two conditions hold: a' in T(a) \ T+(b) AND T(b) \ T+(a) not empty 
+    # 3. If the following two conditions hold: a' in T(a) \ T+(b) AND T(b) \ T+(a) not empty
     if (a_prime in list(set(G.neighbors(a)) - {b} - set(G.neighbors(b)))) and not (list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))) == []):
         # 3.1. Choose a vertex b' in T(b) \ T+(a)
-        b_prime = random.choice(list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
+        b_prime = random.choice(
+            list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
         # 3.2. Replace edges (a, a_prime), (b, b_prime) with (a, b_prime), (b, a_prime)
         G.add_edge(a, b_prime)
         G.add_edge(b, a_prime)
@@ -142,6 +157,8 @@ def flip_operation(G):
         return G, None, None
 
 # Flip operation according to Schindelhauer/Mahlmann paper.
+
+
 def flip_operation_old(G):
     G = copy.deepcopy(G)
     a, b = random.choice(list(G.edges))
@@ -161,6 +178,3 @@ def flip_operation_old(G):
     G.remove_edge(c, d)
 
     return G, {(a, b), (c, d)}, {(a, c), (b, d)}
-
-
-
