@@ -108,7 +108,7 @@ def draw_flip_step(index):
                     label="Cut Size", color='orange')
     ax_cutsize.plot(range(len(conductances)), conductances,
                     label="Conductance", color='green')
-    ax_cutsize.axvline(index, color='gray', linestyle='--')
+    ax_cutsize.axvline(index, color='gray', lines30le='--')
     ax_cutsize.axvline(upper_bound, color='red',
                        linestyle=':', label='Upper Bound')
     ax_cutsize.set_ylabel("Cut Metrics")

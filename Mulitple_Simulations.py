@@ -75,13 +75,31 @@ SAMPLING_RATE_HIGH = math.ceil(n/50)      # alle 10 Flips Spektrum messen
 SAMPLING_RATE_LOW = math.ceil(n/5)
 
 num_simulations = 10
-# max_flips = 500000
+max_flips = 50000000
 criterion = "normalized"
+
+# |spec - epsilon| <= Band gilt als Treffer
+# so viele Messungen in Folge im Band
+REQUIRED_HITS = 15
+COUNT_CONSECUTIVE = True          # True für aufeinanderfolgende Treffer
+
+global_stop_at_flips = None       #
 
 real_upper_bound = int(n * d * (math.log2(n)) ** 2)
 upper_bound = min(int(n * d * (math.log2(n)) ** 2), max_flips)
 epsilon = Calc_updated.recommend_threshold_by_sampling(n, d)
 print(epsilon)
+
+
+def compute_band(epsilon, rel=0.05, abs_min=1e-3, abs_max=None):
+    band = max(abs_min, rel * abs(float(epsilon)))
+    if abs_max is not None:
+        band = min(band, abs_max)
+    return band
+
+
+# 5 Prozent von epsilon, mindestens 1e-3
+THRESHOLD_BAND = compute_band(epsilon, rel=0.05, abs_min=1e-3)
 
 # Arrays für Simulationsergebnisse
 all_specs = []
@@ -91,7 +109,7 @@ simulations = []  # speichert Daten jeder einzelnen Simulation
 for sim in range(num_simulations):
     nodes = list(G.nodes)
     high_prescision = True
-    print("Simulation", sim+1, "of", num_simulations)
+    print("Simulation", sim + 1, "of", num_simulations)
     current_G = G.copy()
     specvals = []
     flip_info = []
@@ -100,31 +118,67 @@ for sim in range(num_simulations):
     spec = Calc_updated.spectral_gap_normalized_sparse(current_G, d)
     specvals.append(spec)
 
+    # Zähler für Treffer im Band
+    hits_in_band = 0
+
     flips_done = 0
-    while flips_done < upper_bound:
+
+    # Obergrenze für diese Simulation
+    this_upper = upper_bound if global_stop_at_flips is None else min(
+        upper_bound, global_stop_at_flips)
+
+    while flips_done < this_upper:
         current_G, removed, added = Graph.flip_operation(current_G)
         flip_info.append((removed, added))
         flips_done += 1
-        # nur alle MEASURE_EVERY Flips messen
+
+        # nur an den Samplingpunkten messen
+        measured_now = False
         if high_prescision:
             if flips_done % SAMPLING_RATE_HIGH == 0:
                 spec = Calc_updated.spectral_gap_normalized_sparse(
                     current_G, d)
+                measured_now = True
             if spec >= epsilon:
                 high_prescision = False
         else:
             if flips_done % SAMPLING_RATE_LOW == 0:
                 spec = Calc_updated.spectral_gap_normalized_sparse(
                     current_G, d)
+                measured_now = True
+
+        if measured_now:
+            in_band = abs(float(spec) - float(epsilon)) <= THRESHOLD_BAND
+            if COUNT_CONSECUTIVE:
+                hits_in_band = hits_in_band + 1 if in_band else 0
+            else:
+                if in_band:
+                    hits_in_band += 1
+
+            if global_stop_at_flips is None and hits_in_band >= REQUIRED_HITS:
+                global_stop_at_flips = flips_done+math.ceil(upper_bound/10)
+                print(
+                    f"Früher Stopp nach {global_stop_at_flips} Flips festgelegt in Simulation 1")
+                specvals.append(float(spec) if np.isfinite(spec) else np.nan)
+                if draw_graphs:
+                    graphs.append(current_G.copy())
+                break
+
+        # Werte anhängen wie gehabt
         specvals.append(float(spec) if np.isfinite(spec) else np.nan)
         if draw_graphs:
             graphs.append(current_G.copy())
+
         if flips_done % 1000 == 0:
-            print((sim*upper_bound+flips_done) /
-                  (num_simulations*upper_bound)*100, "percent done, high precision: ", high_prescision)
+            pct = (sim * upper_bound + flips_done) / \
+                (num_simulations * upper_bound) * 100
+            print(pct, "percent done, high precision: ", high_prescision)
+
+        # Falls globaler Stopwert schon bekannt ist und erreicht wurde
+        if global_stop_at_flips is not None and flips_done >= global_stop_at_flips:
+            break
 
     simulations.append({
-        # falls du Graphen nicht speichern willst
         "graphs": graphs,
         "specvals": specvals,
         "flip_info": flip_info,
