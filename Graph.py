@@ -45,27 +45,31 @@ def generate_cut_1(G):
     return S
 '''
 def generate_cut_2(G, amount_cliques: int, p_clique_size: int):
-    S_ = [] # hässlicher Code, zu optimieren
+    S= set()
+    # S_ = [] # hässlicher Code, zu optimieren
     nodes = list(G.nodes)
     for i in range(amount_cliques*p_clique_size):
-        S_.append(nodes[i])
-    S =  {S_[i] for i in range(len(S_))}
+        S.add(nodes[i])
+        #S_.append(nodes[i])
+    # S =  {S_[i] for i in range(len(S_))}
     return S
 
 # Maximum Cut Size:
 def generate_cut_3(G, amount_cliques: int, p_clique_size: int):
-    S_ = [] # hässlicher Code, zu optimieren
+    # S_ = [] # hässlicher Code, zu optimieren
+    S = set()
     nodes = list(G.nodes)
     nodes_clique_S = p_clique_size // 2
     # Für jede Clique:
     for i in range(amount_cliques):
-        # Füge drei Knoten zu S hinzu: 
+        # Füge die Hälfte der Knoten zu S hinzu: 
         for j in range(nodes_clique_S):
             # print(f"{i}","I")
             if j < (p_clique_size) :
-                S_.append(f"{i}_{(i+j) % (p_clique_size)}")
+                # S_.append(f"{i}_{(i+j) % (p_clique_size)}")
+                S.add(f"{i}_{(i+j) % (p_clique_size)}")
                 # print(f"{i}_{j}")
-    S =  {S_[i] for i in range(len(S_))}
+    #S =  {S_[i] for i in range(len(S_))}
     return S
 
 def generate_random_cut(G, seed=None):
@@ -129,7 +133,6 @@ def flip_operation(G):
         # 3.1. Choose a vertex b' in T(b) \ T+(a)
         b_prime = random.choice(list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
         # 3.2. Replace edges (a, a_prime), (b, b_prime) with (a, b_prime), (b, a_prime)
-
         G.add_edge(a, b_prime)
         G.add_edge(b, a_prime)
         G.remove_edge(a, a_prime)
