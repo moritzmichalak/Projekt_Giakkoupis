@@ -42,11 +42,6 @@ def calculate_possible_d(n):
     return possible_d
 
 
-'''
-def calculate_d(G):
-    d = next(iter(dict(G.degree()).values()))
-    return d
-'''
 # 28.08.25 / 03.09.25: Erwarteten Cut Strain-Wert durch überprüfen jeder Kante berechnen:
 
 
@@ -199,90 +194,30 @@ def expected_cut_strain_exact(G, S, d, strain):
     return expected
 
 
-def spectral_gap_adjacency(G, d):
-    """Berechnet die unnormalisierte Spektrallücke: d - λ*.
-    λ* ist das Maximum des Betrags aller Eigenwerte außer d.
+def spectral_gap_normalized_sparse(G, d=None, tol=1e-3, maxiter=1000, v0=None):
     """
-    A = xn.to_numpy_array(G, dtype=float)
-    vals = np.linalg.eigvalsh(A)          # symmetrisch, daher stabil
-    # größter Eigenwert außer d
-    lam_star = np.max(np.abs(vals[vals < d - 1e-12]))
-    gap = d - lam_star
-    return gap, lam_star
-
-
-def spectral_gap_normalized(G, d):
-    """Berechnet die normalisierte Spektrallücke γ = λ₂(L),
-    wobei L = I - A/d die normalisierte Laplace-Matrix ist.
+    Normalisierte Spektrallücke gamma, gleich 1,0 minus lambda zwei von A geteilt durch d.
+    A ist die CSR Adjazenzmatrix, d ist der Grad, bei None wird d aus dem Modus der Grade geschätzt.
+    Gibt float zurück, bei Problemen np.nan.
     """
-    A = xn.to_numpy_array(G, dtype=float)
-    n = A.shape[0]
-    L = np.eye(n) - A / d
-    vals = np.linalg.eigvalsh(L)
-    gamma = vals[1]  # zweitkleinster Eigenwert
-    return gamma
-
-
-def spectral_gap_normalized_sparse(G, d, tol=1e-6, maxiter=5000, seed=0):
-    """
-    λ2 des normalisierten Laplacian L = I - A/d, schnell und speichersparend.
-    Gibt den gleichen Wert wie die dichte Variante, bis auf numerische Rundung.
-    """
+    d = float(d)
+    if not np.isfinite(d) or d <= 0:
+        return np.nan
+    A = xn.to_scipy_sparse_array(G, dtype=float, format="csr")
     try:
-        A = xn.to_scipy_sparse_array(G, dtype=float, format="csr")
-        # wir wollen die zwei größten Eigenwerte von A
-        vals = eigsh(
-            A,
-            k=2,
-            which="LA",
-            return_eigenvectors=False,
-            tol=tol,
-            maxiter=maxiter,
-        )
-        vals.sort()                      # [λ2(A), λ1(A) = d]
-        lam2_A = vals[-2]
-        return float(1.0 - lam2_A / float(d))
-    except ArpackNoConvergence:
-        A = xn.to_numpy_array(G, dtype=float)
-        L = np.eye(A.shape[0]) - A / float(d)
-        vals = np.linalg.eigvalsh(L)
-        return float(np.sort(vals)[1])
-
-
-def is_expander(G, d, epsilon=0.1, criterion="normalized"):
-    """
-    Entscheidet ob G ein Expander ist.
-    criterion = "normalized": nutzt γ = λ₂(L)
-    criterion = "adjacency": nutzt (d - λ*)/d
-    """
-    if criterion == "normalized":
-        gamma = spectral_gap_normalized(G, d)
-        return gamma >= epsilon, {"gamma": float(gamma), "epsilon": float(epsilon)}
-    elif criterion == "adjacency":
-        gap, lam_star = spectral_gap_adjacency(G, d)
-        rel = gap / d
-        return rel >= epsilon, {"gap": float(gap), "relative": float(rel),
-                                "lam_star": float(lam_star), "epsilon": float(epsilon)}
-    else:
-        raise ValueError('criterion muss "normalized" oder "adjacency" sein')
-
-
-def spectral_gamma(G, d):
-    A = xn.to_numpy_array(G, dtype=float)
-    n = A.shape[0]
-    L = np.eye(n) - A / d
-    vals = np.linalg.eigvalsh(L)
-    return float(vals[1])
-
-
-# setzt epsilon durch berechnung der durchschnittlichen Spektrallücke bei randomsierten Graphen (--> Expander)
-def _spectral_gap_norm_laplacian_sparse(G):
-    # zwei kleinste Eigenwerte der normalisierten Laplace-Matrix
-    L = xn.normalized_laplacian_matrix(G)  # sparse
-    vals = eigsh(
-        L, k=2, which="SM", return_eigenvectors=False, tol=1e-4)
-    # vals ist aufsteigend sortiert, lambda_1 = 0, also Spektrallücke = lambda_2
-    return float(vals[1])
+        vals = eigsh(A, k=2, which="LA", return_eigenvectors=False,
+                     tol=tol, maxiter=maxiter, v0=v0)
+    except ArpackNoConvergence as e:
+        vals = e.eigenvalues
+        if vals is None or len(vals) < 2:
+            vals, _ = eigsh(A, k=2, which="LA", return_eigenvectors=True, tol=max(
+                tol, 5e-3), maxiter=maxiter*2)
+    vals = np.sort(np.asarray(vals, dtype=float))
+    if vals.size < 2 or not np.all(np.isfinite(vals)):
+        return np.nan
+    lam2 = float(vals[-2])
+    gamma = 1.0 - lam2 / d
+    return float(gamma) if np.isfinite(gamma) else np.nan
 
 
 def _one_trial(n, d, seed):

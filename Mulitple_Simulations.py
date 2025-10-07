@@ -7,30 +7,6 @@ from matplotlib.widgets import Button
 import Graph
 import Calc_updated
 
-# -------- Spektralmetrik --------
-
-
-def spectral_value(G, d, criterion="normalized"):
-    """
-    Liefert den Spektralwert für die Expanderentscheidung.
-    criterion gleich "normalized": γ gleich λ zwei von L, L gleich I minus A geteilt durch d
-    criterion gleich "adjacency": relative Lücke gleich (d minus λ Stern) geteilt durch d
-    """
-    A = nx.to_numpy_array(G, dtype=float)
-    if criterion == "normalized":
-        n = A.shape[0]
-        L = np.eye(n) - A / d
-        vals = np.linalg.eigvalsh(L)            # aufsteigend, λ eins gleich 0
-        return float(vals[1])
-    elif criterion == "adjacency":
-        vals = np.linalg.eigvalsh(A)            # aufsteigend
-        # größter Eigenwert ist d, λ Stern ist maximale Größe der übrigen
-        lam_star = np.max(np.abs(vals[:-1])) if len(vals) > 1 else 0.0
-        gap_rel = (d - lam_star) / d
-        return float(gap_rel)
-    else:
-        raise ValueError('criterion muss "normalized" oder "adjacency" sein')
-
 
 """
 # Auswahl Graph durch User
@@ -65,6 +41,10 @@ if d > (math.log2(n) ** 2):
 
 """
 
+
+Gtest = nx.random_regular_graph(4, 200, seed=0)
+print("test spec =", Calc_updated.spectral_gap_normalized_sparse(Gtest, 4))
+
 print("Choose number of nodes:")
 n = int(input())
 possible_d = Calc_updated.calculate_possible_d(n)
@@ -79,9 +59,11 @@ print("You chose a graph with ", number_of_cliques,
       " cliques, each with a size of", size_of_cliques, " nodes.")
 G, pos = Graph.create_ring_of_cliques(number_of_cliques, size_of_cliques)
 
+SAMPLING_RATE_HIGH = math.ceil(n/50)      # alle 10 Flips Spektrum messen
+SAMPLING_RATE_LOW = math.ceil(n/5)
 
-num_simulations = 20
-max_flips = 5000
+num_simulations = 10
+max_flips = 500000
 criterion = "normalized"
 
 real_upper_bound = int(n * d * (math.log2(n)) ** 2)
@@ -95,46 +77,63 @@ simulations = []  # speichert Daten jeder einzelnen Simulation
 
 # Mehrfache Simulationen
 for sim in range(num_simulations):
-    print("Simulation ", sim+1, " of ", num_simulations)
-    current_G = copy.deepcopy(G)
-    graphs = [copy.deepcopy(current_G)]
+    nodes = list(G.nodes)
+    high_prescision = True
+    print("Simulation", sim+1, "of", num_simulations)
+    current_G = G.copy()
     specvals = []
-    flip_info = [(set(), set())]
+    flip_info = []
+    graphs = [copy.deepcopy(current_G)]
 
     spec = Calc_updated.spectral_gap_normalized_sparse(current_G, d)
     specvals.append(spec)
 
     flips_done = 0
     while flips_done < upper_bound:
-        new_G, removed, added = Graph.flip_operation(current_G)
-        if removed is None or added is None:
+        success, removed, added = Graph.flip_operation(current_G, nodes)
+        if not success:
             continue
-        current_G = new_G
-        graphs.append(copy.deepcopy(current_G))
-        spec = Calc_updated.spectral_gap_normalized_sparse(current_G, d)
-        specvals.append(spec)
+        # graphs.append(copy.deepcopy(current_G))
         flip_info.append((removed, added))
         flips_done += 1
-        if (flips_done % 1000 == 0):
-            print(flips_done, "Flips done")
+        # nur alle MEASURE_EVERY Flips messen
+        if high_prescision:
+            if flips_done % SAMPLING_RATE_HIGH == 0:
+                spec = Calc_updated.spectral_gap_normalized_sparse(
+                    current_G, d)
+            if spec >= epsilon:
+                high_prescision = False
+        else:
+            if flips_done % SAMPLING_RATE_LOW == 0:
+                spec = Calc_updated.spectral_gap_normalized_sparse(
+                    current_G, d)
+        specvals.append(float(spec) if np.isfinite(spec) else np.nan)
+        graphs.append(current_G.copy())
+        if flips_done % 1000 == 0:
+            print((sim*upper_bound+flips_done) /
+                  (num_simulations*upper_bound)*100, "percent done")
 
     simulations.append({
+        # falls du Graphen nicht speichern willst
         "graphs": graphs,
         "specvals": specvals,
         "flip_info": flip_info,
     })
-
     all_specs.append(specvals)
 
 # In Arrays konvertieren
-max_len = max(len(c) for c in all_specs)
-spec_np = np.full((len(all_specs), max_len), np.nan)
-for i, c in enumerate(all_specs):
-    spec_np[i, :len(c)] = c
+# all_specs: Liste von Listen
+max_len = max(len(s) for s in all_specs) if all_specs else 0
+spec_np = np.full((len(all_specs), max_len), np.nan, dtype=float)
+for i, s in enumerate(all_specs):
+    spec_np[i, :len(s)] = [v if np.isfinite(v) else np.nan for v in s]
 
 # Durchschnittswerte berechnen
 mean_spec = np.nanmean(spec_np, axis=0)
-std_spec = np.nanstd(spec_np, axis=0)
+mins = np.nanmin(spec_np, axis=0)
+maxs = np.nanmax(spec_np, axis=0)
+
+steps = np.arange(spec_np.shape[1])
 
 # Extremfälle bestimmen, basierend auf erstem Zeitpunkt, an dem der Threshold erreicht wird
 threshold = epsilon
@@ -201,11 +200,8 @@ def view_simulation(sim_index, back_callback):
             else:
                 edge_colors.append("black")
 
-        node_colors = [
-            "yellow" if n in cut_set else "lightblue" for n in G.nodes()]
-
         nx.draw(G, pos, ax=ax_graph, with_labels=True,
-                node_color=node_colors, edge_color=edge_colors,
+                edge_color=edge_colors,
                 node_size=500, font_size=8)
 
         ax_graph.set_title(
@@ -252,14 +248,8 @@ def show_main_plot():
     ax.plot(range(len(best_case)), best_case, label="Best Case", color="blue")
     ax.plot(range(len(worst_case)), worst_case,
             label="Worst Case", color="red")
-    ax.plot(steps, mean_spec, label="Avg Spectral", color="green")
-    ax.fill_between(
-        steps,
-        mean_spec - std_spec,
-        mean_spec + std_spec,
-        color="green",
-        alpha=0.3,
-    )
+    ax.plot(steps, mean_spec, label="Avg Spectral")
+    ax.fill_between(steps, mins, maxs, alpha=0.3, label="Range")
     ax.axhline(threshold, color="gray", linestyle="--",
                label=f"Threshold {threshold}")
     ax.legend()
