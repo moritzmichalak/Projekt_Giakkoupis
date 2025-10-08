@@ -39,6 +39,17 @@ upper_bound = int(input())
 if upper_bound < 0:
     raise ValueError("upper_bound must be >= 0")
 
+# --- Nutzerentscheidung: Graph visualisieren? ---
+default_visualize = (n <= 100)
+default_str = "y" if default_visualize else "n"
+print(f"Visualize the graph during navigation? (y/n) [default {default_str}]")
+resp = input().strip().lower()
+visualize_graph = (
+    default_visualize if resp == "" else resp in ("y", "yes", "j", "ja")
+)
+# Labels nur, wenn sinnvoll (spart Zeit bei n>100)
+draw_labels = visualize_graph and (n <= 100)
+
 # =========================
 # Drei Cuts (in gewünschter Reihenfolge)
 # =========================
@@ -60,30 +71,79 @@ CUT_TITLES = {
 graphs = [copy.deepcopy(G0)]
 flip_info = [(set(), set())]  # i=0 leer
 current_G = G0
+changed_flags = [False]   # Schritt 0: nichts geändert
 
-while len(graphs) <= upper_bound:
+amount_flip_operations = 0
+while amount_flip_operations < upper_bound:
     new_G, removed, added = Graph.flip_operation(current_G)
-    if removed is None or added is None:
-        continue  # ungültiger Versuch -> erneut
+    
+    amount_flip_operations += 1
+
+    # in jedem Versuch Snapshot speichern
     current_G = new_G
     graphs.append(copy.deepcopy(current_G))
-    removed_norm = {tuple(sorted(e)) for e in removed}
-    added_norm   = {tuple(sorted(e)) for e in added}
-    flip_info.append((removed_norm, added_norm))
 
+    # nur bei erfolgreichem Flip Kanteninfo anhängen
+    if (removed is not None) and (added is not None):
+        removed_norm = {tuple(sorted(e)) for e in removed}
+        added_norm   = {tuple(sorted(e)) for e in added}
+        flip_info.append((removed_norm, added_norm))
+        changed_flags.append(True)
+    else:
+        flip_info.append((set(), set()))
+        changed_flags.append(False)
+
+    # Fortschritt alle ~1% (mind. alle 1 Versuche)
+    report_every = max(1, upper_bound // 100)
+    if amount_flip_operations % report_every == 0:
+        percentage = (amount_flip_operations * 100.0) / upper_bound
+        print(f"{percentage:.0f} %  |  attempts: {amount_flip_operations}")
+# x-Achse: ein Punkt pro Snapshot (inkl. Startzustand)
 steps = list(range(len(graphs)))
+#steps = list(range(len(graphs)))
 
 # =========================
 # Metriken für alle Cuts und Snapshots
 # =========================
 
+'''
 # Expected-Arrays mit 0 für Schritt 0 starten (für Konsistenz),
 # aber die Anzeige in den Plots maskieren wir später auf NaN.
 metrics = {
     name: {"strain": [], "exp_exact": [0.0], "exp_alt": [0.0]}
     for name in CUTS
 }
+'''
+# Initialisieren
+metrics = {name: {"strain": [], "exp_exact": [], "exp_alt": []} for name in CUTS}
 
+amount_of_plots = len(graphs)
+current_step_plot = 0
+for t, Gsnap in enumerate(graphs):
+    for name, S in CUTS.items():
+        if t == 0:
+            strain0, _, _ = Calc_updated.cut_metrics(Gsnap, S, d)
+            metrics[name]["strain"].append(strain0)
+            metrics[name]["exp_exact"].append(np.nan)  # in Plot maskiert
+            metrics[name]["exp_alt"].append(np.nan)
+        else:
+            if changed_flags[t]:
+                strain, _, _ = Calc_updated.cut_metrics(Gsnap, S, d)
+                exp_exact = Calc_updated.expected_cut_strain_exact(Gsnap, S, d, strain)
+                exp_alt   = Calc_updated.calculate_expected_cut_strain_alternative(Gsnap, S, d, strain)
+                metrics[name]["strain"].append(strain)
+                metrics[name]["exp_exact"].append(exp_exact)
+                metrics[name]["exp_alt"].append(exp_alt)
+            else:
+                # Graph unverändert: Werte einfach übernehmen
+                metrics[name]["strain"].append(metrics[name]["strain"][t-1])
+                metrics[name]["exp_exact"].append(metrics[name]["exp_exact"][t-1])
+                metrics[name]["exp_alt"].append(metrics[name]["exp_alt"][t-1])
+    current_step_plot += 1
+    print("plotting: ",(current_step_plot*100)/amount_of_plots, "%")
+
+    
+'''              
 # Schritt 0: nur den tatsächlichen Strain berechnen
 G0snap = graphs[0]
 for name, S in CUTS.items():
@@ -99,26 +159,40 @@ for Gsnap in graphs[1:]:
         metrics[name]["strain"].append(strain)
         metrics[name]["exp_exact"].append(exp_exact)
         metrics[name]["exp_alt"].append(exp_alt)
-
+'''  
 # =========================
-# Plot-Layout: links 3 Charts (pro Cut), rechts Info+Graph (50%)
+# Plot-Layout: links 3 Charts (pro Cut), optional rechts Graph; Info oben
 # =========================
 fig = plt.figure(figsize=(14, 9))
-gs = fig.add_gridspec(
-    nrows=4, ncols=2,
-    width_ratios=[1.0, 1.0],              # 50% Charts links, 50% rechts (Info + Graph)
-    height_ratios=[0.50, 1.0, 1.0, 1.0],  # schlankes Info-Panel oben
-    left=0.05, right=0.98, bottom=0.10, top=0.95,
-    wspace=0.25, hspace=0.25
-)
 
-# Links: drei Charts (je Cut)
-ax_cut1  = fig.add_subplot(gs[1, 0])
-ax_cut2  = fig.add_subplot(gs[2, 0], sharex=ax_cut1)
-ax_cut3  = fig.add_subplot(gs[3, 0], sharex=ax_cut1)
-# Rechts: Info-Panel oben + Graph unten (über 3 Zeilen)
-ax_info  = fig.add_subplot(gs[0, 1])
-ax_graph = fig.add_subplot(gs[1:, 1])
+if visualize_graph:
+    gs = fig.add_gridspec(
+        nrows=4, ncols=2,
+        width_ratios=[1.0, 1.0],              # 50% Charts links, 50% rechts (Info + Graph)
+        height_ratios=[0.50, 1.0, 1.0, 1.0],  # schlankes Info-Panel oben
+        left=0.05, right=0.98, bottom=0.10, top=0.95,
+        wspace=0.25, hspace=0.25
+    )
+    # Links: drei Charts (je Cut)
+    ax_cut1  = fig.add_subplot(gs[1, 0])
+    ax_cut2  = fig.add_subplot(gs[2, 0], sharex=ax_cut1)
+    ax_cut3  = fig.add_subplot(gs[3, 0], sharex=ax_cut1)
+    # Rechts: Info-Panel oben + Graph unten (über 3 Zeilen)
+    ax_info  = fig.add_subplot(gs[0, 1])
+    ax_graph = fig.add_subplot(gs[1:, 1])
+else:
+    gs = fig.add_gridspec(
+        nrows=4, ncols=1,
+        height_ratios=[0.45, 1.0, 1.0, 1.0],
+        left=0.06, right=0.98, bottom=0.10, top=0.95,
+        hspace=0.25
+    )
+    # Info oben, darunter die drei Charts – volle Breite
+    ax_info  = fig.add_subplot(gs[0, 0])
+    ax_cut1  = fig.add_subplot(gs[1, 0])
+    ax_cut2  = fig.add_subplot(gs[2, 0], sharex=ax_cut1)
+    ax_cut3  = fig.add_subplot(gs[3, 0], sharex=ax_cut1)
+    ax_graph = None  # WICHTIG: signalisiert "kein Graph zeichnen"
 
 # --- Helper zum Plotten der 3 Kennzahlen pro Cut ---
 def plot_cut_metrics(ax, name, show_xlabel=False):
@@ -227,6 +301,9 @@ _ui_type = _bind_dropdown(drop_ax, labels, label_by_key[selected_cut_key[0]])
 # Graph-Zeichnen
 # =========================
 def draw_graph_at_step(i: int):
+    if not visualize_graph or ax_graph is None:
+        return  # Graph-Darstellung deaktiviert
+    
     ax_graph.clear()
     G = graphs[i]
     removed_edges, added_edges = flip_info[i] if i < len(flip_info) else (set(), set())
@@ -236,24 +313,27 @@ def draw_graph_at_step(i: int):
     node_cols = ["yellow" if (u in S) else "lightblue" for u in G.nodes()]
 
     # Basis: Knoten + vorhandene Kanten
-    nx.draw_networkx_nodes(G, pos, ax=ax_graph, node_color=node_cols, node_size=120)
+    nx.draw_networkx_nodes(G, pos, ax=ax_graph, node_color=node_cols,
+                           node_size=80 if len(G) > 150 else 120)
     nx.draw_networkx_edges(G, pos, ax=ax_graph, edge_color="black", width=1.2)
 
     # Hinzugefügte Kanten in diesem Schritt (falls im aktuellen G vorhanden): rot
     added_list = [(u, v) for (u, v) in added_edges if G.has_edge(u, v)]
     if added_list:
-        nx.draw_networkx_edges(G, pos, edgelist=added_list, ax=ax_graph, edge_color="red", width=2.0)
+        nx.draw_networkx_edges(G, pos, edgelist=added_list, ax=ax_graph,
+                               edge_color="red", width=2.0)
 
     # Entfernte Kanten in diesem Schritt (existieren nicht mehr in G): gestrichelt blau
     for (u, v) in removed_edges:
         if u in pos and v in pos:
             x = [pos[u][0], pos[v][0]]
             y = [pos[u][1], pos[v][1]]
-            ax_graph.plot(x, y, linestyle="--", color="blue", linewidth=1.8, alpha=0.9, zorder=0)
+            ax_graph.plot(x, y, linestyle="--", color="blue", linewidth=1.6, alpha=0.9, zorder=0)
 
-    # Knotennamen (Labels) – transparenter Hintergrund
-    labels_nodes = {node: str(node) for node in G.nodes()}
-    nx.draw_networkx_labels(G, pos, labels=labels_nodes, ax=ax_graph, font_size=6)
+    # Labels optional (bei großen n aus)
+    if draw_labels:
+        labels_nodes = {node: str(node) for node in G.nodes()}
+        nx.draw_networkx_labels(G, pos, labels=labels_nodes, ax=ax_graph, font_size=6)
 
     ax_graph.set_title(f"Ring of Cliques – Schritt {i}/{len(graphs)-1}")
     ax_graph.set_axis_off()
@@ -296,9 +376,10 @@ def update_all(i: int):
     # Cursor updaten
     for ln in (cursor1, cursor2, cursor3):
         ln.set_xdata([i, i])
-    # Info-Panel + Graph neu zeichnen
+    # Info-Panel + (optional) Graph neu zeichnen
     update_info_panel(i)
-    draw_graph_at_step(i)
+    if ax_graph is not None and visualize_graph:
+        draw_graph_at_step(i)
     fig.canvas.draw_idle()
 
 def on_next(event):

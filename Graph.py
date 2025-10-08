@@ -135,8 +135,37 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
     return G, pos
 
 # Flip operation according to Giakkoupis paper.
+def flip_operation(G):
+    # Kein deepcopy hier – wir mutieren G nur bei Erfolg.
+    # 1) zufällige (ungerichtete) Kante wählen
+    a, b = random.choice(tuple(G.edges()))
 
+    # 2) Nachbarschaften einmalig als Sets
+    Na = set(G.adj[a])   # == set(G.neighbors(a)), aber ohne wiederholte Konvertierung
+    Nb = set(G.adj[b])
 
+    # a' gleichmäßig aus N(a) wählen (darf auch b sein – Filter kommt in Schritt 3)
+    a_prime = random.choice(tuple(Na))
+
+    # 3) Bedingungen prüfen:
+    #    a' ∈ N(a)\{b}\N(b)  und  N(b)\{a}\N(a) ≠ ∅
+    allowed_B = Nb - {a} - Na
+    if (a_prime in (Na - {b} - Nb)) and allowed_B:
+        # 3.1) b' ∈ N(b)\{a}\N(a) wählen
+        b_prime = random.choice(tuple(allowed_B))
+
+        # 3.2) Flip durchführen
+        G.remove_edge(a, a_prime)
+        G.remove_edge(b, b_prime)
+        G.add_edge(a, b_prime)
+        G.add_edge(b, a_prime)
+
+        return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}
+    else:
+        # kein Flip – G bleibt unverändert
+        return G, None, None
+
+'''
 def flip_operation(G):
     # 1. Choose an (ordered) pair of adjacent vertices a,b in V (this is the hub-edge)
     a, b = random.choice(list(G.edges))
@@ -155,7 +184,7 @@ def flip_operation(G):
         return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}
     else:
         return G, None, None
-
+'''
 # Flip operation according to Schindelhauer/Mahlmann paper.
 
 

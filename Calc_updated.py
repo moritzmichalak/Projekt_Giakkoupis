@@ -49,52 +49,47 @@ def calculate_expected_cut_strain_alternative(G, S, d, strain):
     V = set(G.nodes)
     n = len(V)
     m = G.number_of_edges()
+
+    neighbors = {u: set(G.neighbors(u)) for u in G.nodes()}
+
     expected_cut_strain_alternative = 0
     # cut_strain_scenario = strain
     for a, b in G.edges:  # number of iterations = m
-        for a_prime in set(G.neighbors(a)):  # number of iterations = d
+        Na = neighbors[a]
+        Nb = neighbors[b]
+        for a_prime in Na:  # number of iterations = d
             # Does a' permit flip-operation?
-            if (a_prime in list(set(G.neighbors(a)) - {b} - set(G.neighbors(b)))) and not (list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))) == []):
+            if (a_prime in (Na - {b} - Nb)) and (len(Nb - {a} - Na) > 0):
                 # a' permits flip-operation.
                 sum = 0
                 # variable number of iterations.
-                for b_prime in set(G.neighbors(b)) - {a} - set(G.neighbors(a)):
+                for b_prime in (Nb - {a} - Na):
                     cut_strain_scenario = strain
                     # The cut runs between a' und b' -> flip-operation changes cut strain.
                     if (a_prime in S) ^ (b_prime in S):
                         # print("(a,b) = ", a, b, "a' = ", a_prime, "b' = ", b_prime,)
                         # Calculate old values:
-                        alpha_a = len(set(G.neighbors(a)).intersection(
-                            S)) / len(set(G.neighbors(a)))
-                        alpha_b = len(set(G.neighbors(b)).intersection(
-                            S)) / len(set(G.neighbors(b)))
-                        alpha_a_prime = len(set(G.neighbors(a_prime)).intersection(
-                            S)) / len(set(G.neighbors(a_prime)))
-                        alpha_b_prime = len(set(G.neighbors(b_prime)).intersection(
-                            S)) / len(set(G.neighbors(b_prime)))
+                        Na_prime = neighbors[a_prime]
+                        Nb_prime = neighbors[b_prime]
+                        alpha_a        = len(Na.intersection(S)) / len(Na)
+                        alpha_b        = len(Nb.intersection(S)) / len(Nb)
+                        alpha_a_prime  = len(Na_prime.intersection(S)) / len(Na_prime)
+                        alpha_b_prime  = len(Nb_prime.intersection(S)) / len(Nb_prime)
                         # print("alpha-Werte vorher: ", alpha_a, alpha_b, alpha_a_prime, alpha_b_prime)
                         # Substract old values:
                         cut_strain_scenario -= (alpha_a * (1 - alpha_a) + alpha_b * (
                             1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
                         # Calculate new values:
-                        if a_prime in S:  # (a_prime  in S and b_prime not in S)
-                            alpha_a = (len(set(G.neighbors(a)).intersection(
-                                S)) - 1) / len(set(G.neighbors(a)))
-                            alpha_b = (len(set(G.neighbors(b)).intersection(
-                                S)) + 1) / len(set(G.neighbors(b)))
-                            alpha_a_prime = (len(set(G.neighbors(a_prime)).intersection(
-                                S)) - 1) / len(set(G.neighbors(a_prime)))
-                            alpha_b_prime = (len(set(G.neighbors(b_prime)).intersection(
-                                S)) + 1) / len(set(G.neighbors(b_prime)))
-                        else:  # (a_prime not in S and b_prime  in S)
-                            alpha_a = (len(set(G.neighbors(a)).intersection(
-                                S)) + 1) / len(set(G.neighbors(a)))
-                            alpha_b = (len(set(G.neighbors(b)).intersection(
-                                S)) - 1) / len(set(G.neighbors(b)))
-                            alpha_a_prime = (len(set(G.neighbors(a_prime)).intersection(
-                                S)) + 1) / len(set(G.neighbors(a_prime)))
-                            alpha_b_prime = (len(set(G.neighbors(b_prime)).intersection(
-                                S)) - 1) / len(set(G.neighbors(b_prime)))
+                        if a_prime in S:  # (a' in S, b' not in S)
+                            alpha_a        = (len(Na.intersection(S)) - 1) / len(Na)
+                            alpha_b        = (len(Nb.intersection(S)) + 1) / len(Nb)
+                            alpha_a_prime  = (len(Na_prime.intersection(S)) - 1) / len(Na_prime)
+                            alpha_b_prime  = (len(Nb_prime.intersection(S)) + 1) / len(Nb_prime)
+                        else:             # (a' not in S, b' in S)
+                            alpha_a        = (len(Na.intersection(S)) + 1) / len(Na)
+                            alpha_b        = (len(Nb.intersection(S)) - 1) / len(Nb)
+                            alpha_a_prime  = (len(Na_prime.intersection(S)) + 1) / len(Na_prime)
+                            alpha_b_prime  = (len(Nb_prime.intersection(S)) - 1) / len(Nb_prime)
                         # print("alpha-Werte nachher: ", alpha_a, alpha_b, alpha_a_prime, alpha_b_prime)
                         # cut strain for specific 3-node-path : (a',a) - (a,b) - (b,b')
                         cut_strain_scenario += (alpha_a * (1 - alpha_a) + alpha_b * (
@@ -102,11 +97,9 @@ def calculate_expected_cut_strain_alternative(G, S, d, strain):
                     # sum of all cut strain over all possible b'
                     sum += cut_strain_scenario
                 # weighted cut strain
-                averaged_new_strain = (
-                    sum / len(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
+                averaged_new_strain = sum / len(Nb - {a} - Na)
                 # print("averaged_new_strain = ", averaged_new_strain)
-                expected_cut_strain_alternative += (
-                    averaged_new_strain / (m*d))
+                expected_cut_strain_alternative += (averaged_new_strain / (m*d))
             else:
                 # a' does not permit flip-operation.
                 expected_cut_strain_alternative += (strain / (m*d))
@@ -121,47 +114,56 @@ def expected_cut_strain_exact(G, S, d, strain):
     # d = next(iter(dict(G.degree()).values()))  # assumes d-regular
     delta = 1 / d
 
+    neighbors = {u: set(G.neighbors(u)) for u in G.nodes()}
+
     def Gamma(u):
-        return set(G.neighbors(u))
+        return neighbors[u]
 
     def Gamma_plus(u):
-        return Gamma(u).union({u})
+        return neighbors[u] | {u}
 
     def alpha(u):
-        neighbors = Gamma(u)
-        return len(neighbors.intersection(S)) / len(neighbors) if neighbors else 0
+        Nu = neighbors[u]
+        return len(Nu & S) / len(Nu) if Nu else 0
 
     def alpha_uv(u, v):
-        neighbors = Gamma(u)
-        return len(neighbors.intersection(S).intersection(Gamma(v))) / len(neighbors) if neighbors else 0
+        Nu = neighbors[u]
+        return len(Nu & S & neighbors[v]) / len(Nu) if Nu else 0
 
     def alpha_bar_uv(u, v):
-        neighbors = Gamma(u)
-        return len(neighbors.intersection(V - S).intersection(Gamma(v))) / len(neighbors) if neighbors else 0
+        Nu = neighbors[u]
+        return len(Nu & (V - S) & neighbors[v]) / len(Nu) if Nu else 0
 
     def beta(u, v):
-        neighbors = Gamma(u)
-        if not neighbors:
+        Nu = neighbors[u]
+        if not Nu:
             return 0
-        intersect = neighbors.intersection(S)
-        restricted = intersect - Gamma_plus(v)
-        return len(restricted) / len(neighbors)
+        restricted = (Nu & S) - Gamma_plus(v)
+        return len(restricted) / len(Nu)
 
     def beta_bar(u, v):
-        neighbors = Gamma(u)
-        if not neighbors:
+        Nu = neighbors[u]
+        if not Nu:
             return 0
-        intersect = neighbors.intersection(V - S)
-        restricted = intersect - Gamma_plus(v)
-        return len(restricted) / len(neighbors)
+        restricted = (Nu & (V - S)) - Gamma_plus(v)
+        return len(restricted) / len(Nu)
 
     def rho(u, v):
-        neighbors = Gamma(u)
-        if not neighbors:
+        Nu = neighbors[u]
+        if not Nu:
             return 0
-        return len(neighbors - Gamma_plus(v)) / len(neighbors)
+        return len(Nu - Gamma_plus(v)) / len(Nu)
 
     def gamma(u, v):
+        if Gamma_plus(u) == Gamma_plus(v):
+            return 0
+        if (u in S) and (v in S):
+            return beta_bar(u, v) + beta_bar(v, u) + 2 * (beta(u, v) * beta_bar(v, u) + beta_bar(u, v) * beta(v, u)) / rho(u, v)
+        if (u not in S) and (v not in S):
+            return beta(u, v) + beta(v, u) + 2 * (beta(u, v) * beta_bar(v, u) + beta_bar(u, v) * beta(v, u)) / rho(u, v)
+        # über der Schnittkante:
+        return beta(u, v) + beta_bar(v, u) + 4 * beta(u, v) * beta_bar(v, u) / rho(u, v)
+    '''
         if Gamma_plus(u) == Gamma_plus(v):
             return 0
 
@@ -175,7 +177,7 @@ def expected_cut_strain_exact(G, S, d, strain):
             return beta(u, v) + beta_bar(v, u) + 4 * beta(u, v) * beta_bar(v, u) / rho(u, v)
 
         return 0
-
+    '''
     # Tatsächlicher cut-strain:
 
     # cut_strain, conductance, cut_edges = cut_metrics(G, S, d)
@@ -186,12 +188,10 @@ def expected_cut_strain_exact(G, S, d, strain):
     sum_gamma = 0
     for u, v in G.edges():
         diff = beta(u, v) - beta(v, u)
-        sum_diff_squared += diff ** 2
+        sum_diff_squared += diff * diff
         sum_gamma += gamma(u, v)
 
-    expected = strain + (4 * delta / m) * sum_diff_squared - \
-        (delta ** 2 / m) * sum_gamma
-    return expected
+    return strain + (4 * delta / m) * sum_diff_squared - (delta ** 2 / m) * sum_gamma
 
 
 def spectral_gap_normalized_sparse(G, d=None, tol=1e-3, maxiter=1000, v0=None):
