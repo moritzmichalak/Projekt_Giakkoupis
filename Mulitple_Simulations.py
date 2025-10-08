@@ -37,9 +37,10 @@ else:
     all_flips = False
 G, pos = Graph.create_ring_of_cliques(number_of_cliques, size_of_cliques)
 
-SAMPLING_RATE_HIGH = math.ceil(n/50)      # alle 10 Flips Spektrum messen
-SAMPLING_RATE_LOW = math.ceil(n/5)
-if n >= 5000:
+SAMPLING_RATE_HIGH = math.ceil(n/10)      # alle 10 Flips Spektrum messen
+SAMPLING_RATE_LOW = math.ceil(n/2)
+
+if n >= 10000:
     # etwa alle n Flips
     SAMPLING_RATE_HIGH = max(SAMPLING_RATE_HIGH, n)
     SAMPLING_RATE_LOW = max(SAMPLING_RATE_LOW, 5 * n)
@@ -59,9 +60,10 @@ real_upper_bound = int(n * d * (math.log2(n)) ** 2)
 upper_bound = min(int(n * d * (math.log2(n)) ** 2), max_flips)
 epsilon = Calc_updated.recommend_threshold_by_sampling(n, d)
 print(epsilon)
+print(upper_bound)
 
 
-def compute_band(epsilon, rel=0.05, abs_min=1e-3, abs_max=None):
+def compute_band(epsilon, rel=0.10, abs_min=1e-3, abs_max=None):
     band = max(abs_min, rel * abs(float(epsilon)))
     if abs_max is not None:
         band = min(band, abs_max)
@@ -94,8 +96,7 @@ for sim in range(num_simulations):
     flips_done = 0
 
     # Obergrenze für diese Simulation
-    this_upper = upper_bound if global_stop_at_flips is None else min(
-        upper_bound, global_stop_at_flips)
+    this_upper = upper_bound if global_stop_at_flips is None else global_stop_at_flips
 
     while flips_done < this_upper:
         current_G, removed, added = Graph.flip_operation(current_G)
@@ -127,13 +128,29 @@ for sim in range(num_simulations):
                     hits_in_band += 1
 
             if global_stop_at_flips is None and hits_in_band >= REQUIRED_HITS:
-                global_stop_at_flips = flips_done+math.ceil(upper_bound/10)
+                global_stop_at_flips = flips_done + math.ceil(upper_bound / 8)
                 print(
-                    f"Früher Stopp nach {global_stop_at_flips} Flips festgelegt in Simulation 1")
-                specvals.append(float(spec) if np.isfinite(spec) else np.nan)
-                if draw_graphs:
-                    graphs.append(current_G.copy())
-                break
+                    f"Früher Stopp nach {global_stop_at_flips} Flips festgelegt in Simulation {sim + 1}")
+
+                # nur hier trimmen, weil der Wert jetzt sicher nicht None ist
+                _target_spec_len = 1 + global_stop_at_flips
+                _target_graphs_len = 1 + global_stop_at_flips
+                _target_flips_len = global_stop_at_flips
+
+                for s in simulations:
+                    if s.get("specvals") is not None and len(s["specvals"]) > _target_spec_len:
+                        del s["specvals"][_target_spec_len:]
+                    if draw_graphs and s.get("graphs") is not None and len(s["graphs"]) > _target_graphs_len:
+                        del s["graphs"][_target_graphs_len:]
+                    if draw_graphs and s.get("flip_info") is not None and len(s["flip_info"]) > _target_flips_len:
+                        del s["flip_info"][_target_flips_len:]
+
+                for i in range(len(all_specs)):
+                    if len(all_specs[i]) > _target_spec_len:
+                        del all_specs[i][_target_spec_len:]
+
+                # aktuelle Obergrenze für diese Simulation heruntersetzen
+                this_upper = min(this_upper, global_stop_at_flips)
 
         # Werte anhängen wie gehabt
         specvals.append(float(spec) if np.isfinite(spec) else np.nan)
@@ -141,15 +158,21 @@ for sim in range(num_simulations):
             graphs.append(current_G.copy())
 
         # mindestens alle n Flips, bei großen n noch seltener
-        PROGRESS_EVERY = max(100_000, n)
-        if flips_done % PROGRESS_EVERY == 0:
-            pct = (sim * upper_bound + flips_done) / \
-                (num_simulations * upper_bound) * 100
-            print(f"{pct:.2f} Prozent erledigt")
 
-    # Falls globaler Stopwert schon bekannt ist und erreicht wurde
-    if global_stop_at_flips is not None and flips_done >= global_stop_at_flips:
-        break
+        PROGRESS_EVERY = 5000
+        if flips_done % PROGRESS_EVERY == 0:
+            pct = (sim * this_upper + flips_done) / \
+                (num_simulations * this_upper) * 100
+            print(f"{pct:.2f} Prozent, Wert: ",
+                  spec, ", Threshhold: ", epsilon, ", hits: ", hits_in_band)
+
+    if global_stop_at_flips is not None:
+        _target_spec_len = 1 + global_stop_at_flips
+        specvals = specvals[:_target_spec_len]
+    if draw_graphs and graphs is not None:
+        graphs = graphs[:_target_spec_len]
+    if draw_graphs and flip_info is not None:
+        flip_info = flip_info[:global_stop_at_flips]
 
     simulations.append({
         "graphs": graphs if draw_graphs else None,
@@ -157,6 +180,7 @@ for sim in range(num_simulations):
         "flip_info": flip_info if draw_graphs else None,
     })
     all_specs.append(specvals)
+
 
 # In Arrays konvertieren
 # all_specs: Liste von Listen
