@@ -37,16 +37,12 @@ else:
     all_flips = False
 G, pos = Graph.create_ring_of_cliques(number_of_cliques, size_of_cliques)
 
-SAMPLING_RATE_HIGH = math.ceil(n/10)      # alle 10 Flips Spektrum messen
-SAMPLING_RATE_LOW = math.ceil(n/2)
+SAMPLING_RATE_HIGH = math.ceil(n/20)      # alle 10 Flips Spektrum messen
+SAMPLING_RATE_LOW = math.ceil(n/10)
 
-if n >= 10000:
-    # etwa alle n Flips
-    SAMPLING_RATE_HIGH = max(SAMPLING_RATE_HIGH, n)
-    SAMPLING_RATE_LOW = max(SAMPLING_RATE_LOW, 5 * n)
 
 num_simulations = 10
-max_flips = 50000000
+max_flips = 5000000000000
 criterion = "normalized"
 
 # |spec - epsilon| <= Band gilt als Treffer
@@ -99,10 +95,11 @@ for sim in range(num_simulations):
     this_upper = upper_bound if global_stop_at_flips is None else global_stop_at_flips
 
     while flips_done < this_upper:
-        current_G, removed, added = Graph.flip_operation(current_G)
+        current_G, removed, added = Graph.flip_operation(
+            current_G, number_of_cliques, size_of_cliques)
+        flips_done += 1
         if draw_graphs:
             flip_info.append((removed, added))
-        flips_done += 1
 
         # nur an den Samplingpunkten messen
         measured_now = False
@@ -128,7 +125,8 @@ for sim in range(num_simulations):
                     hits_in_band += 1
 
             if global_stop_at_flips is None and hits_in_band >= REQUIRED_HITS:
-                global_stop_at_flips = flips_done + math.ceil(upper_bound / 8)
+                global_stop_at_flips = flips_done + \
+                    max(math.ceil(upper_bound / 20), 50000)
                 print(
                     f"Früher Stopp nach {global_stop_at_flips} Flips festgelegt in Simulation {sim + 1}")
 
@@ -159,7 +157,7 @@ for sim in range(num_simulations):
 
         # mindestens alle n Flips, bei großen n noch seltener
 
-        PROGRESS_EVERY = 5000
+        PROGRESS_EVERY = 20000
         if flips_done % PROGRESS_EVERY == 0:
             pct = (sim * this_upper + flips_done) / \
                 (num_simulations * this_upper) * 100
