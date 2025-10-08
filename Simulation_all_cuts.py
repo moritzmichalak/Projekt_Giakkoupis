@@ -1,9 +1,9 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button, TextBox  # <-- TextBox hinzugefügt
+from matplotlib.widgets import Button, TextBox
 import copy
 from collections import OrderedDict
-import numpy as np  # <-- NEU: für NaN-Maskierung der Expected-Kurven
+import numpy as np
 
 import Graph
 import Calc_updated
@@ -44,11 +44,38 @@ default_visualize = (n <= 100)
 default_str = "y" if default_visualize else "n"
 print(f"Visualize the graph during navigation? (y/n) [default {default_str}]")
 resp = input().strip().lower()
-visualize_graph = (
-    default_visualize if resp == "" else resp in ("y", "yes", "j", "ja")
-)
-# Labels nur, wenn sinnvoll (spart Zeit bei n>100)
+visualize_graph = (default_visualize if resp == "" else resp in ("y", "yes", "j", "ja"))
 draw_labels = visualize_graph and (n <= 100)
+
+# --- NEU: Intervall für Actual/Expected (Giakkoupis) ---
+def _get_int_or_default(prompt: str, default_val: int) -> int:
+    print(prompt)
+    try:
+        v = int(input())
+        return max(1, v)
+    except Exception:
+        print(f"Invalid input, using default = {default_val}.")
+        return default_val
+
+actual_period = _get_int_or_default(
+    "Every how many steps should the ACTUAL Cut Strain be recomputed? (e.g., 1 = every step)",
+    1
+)
+exact_period = _get_int_or_default(
+    "Every how many steps should the EXPECTED Cut Strain (Giakkoupis) be recomputed? (e.g., 1 = every step)",
+    1
+)
+
+# --- Alternative Expected Cut Strain optional ---
+print("Compute alternative Expected Cut Strain? (y/n) [default n]")
+resp_alt = input().strip().lower()
+compute_alt = (resp_alt in ("y", "yes", "j", "ja"))
+alt_period = None
+if compute_alt:
+    alt_period = _get_int_or_default(
+        "Every how many steps should the ALTERNATIVE metric be recomputed? (e.g., 50)",
+        50
+    )
 
 # =========================
 # Drei Cuts (in gewünschter Reihenfolge)
@@ -75,11 +102,10 @@ changed_flags = [False]   # Schritt 0: nichts geändert
 
 amount_flip_operations = 0
 while amount_flip_operations < upper_bound:
-    new_G, removed, added = Graph.flip_operation(current_G)
-    
+    new_G, removed, added = Graph.flip_operation(current_G, number_of_cliques, size_of_cliques)
     amount_flip_operations += 1
 
-    # in jedem Versuch Snapshot speichern
+    # Snapshot speichern
     current_G = new_G
     graphs.append(copy.deepcopy(current_G))
 
@@ -98,68 +124,95 @@ while amount_flip_operations < upper_bound:
     if amount_flip_operations % report_every == 0:
         percentage = (amount_flip_operations * 100.0) / upper_bound
         print(f"{percentage:.0f} %  |  attempts: {amount_flip_operations}")
+
 # x-Achse: ein Punkt pro Snapshot (inkl. Startzustand)
 steps = list(range(len(graphs)))
-#steps = list(range(len(graphs)))
 
 # =========================
 # Metriken für alle Cuts und Snapshots
 # =========================
+# Charts: nur Actual + Expected (Giakkoupis).
+# Alternative Expected: optional + periodisch.
+# "exp_alt_last_step" merkt letzten Berechnungsschritt.
+# WICHTIG: Expected (Giakkoupis) bei Schritt t nutzt den ACTUAL vom Schritt t-1.
 
-'''
-# Expected-Arrays mit 0 für Schritt 0 starten (für Konsistenz),
-# aber die Anzeige in den Plots maskieren wir später auf NaN.
 metrics = {
-    name: {"strain": [], "exp_exact": [0.0], "exp_alt": [0.0]}
+    name: {"strain": [], "exp_exact": [], "exp_alt": [], "exp_alt_last_step": []}
     for name in CUTS
 }
-'''
-# Initialisieren
-metrics = {name: {"strain": [], "exp_exact": [], "exp_alt": []} for name in CUTS}
 
 amount_of_plots = len(graphs)
 current_step_plot = 0
 for t, Gsnap in enumerate(graphs):
+    current_step_plot += 1
     for name, S in CUTS.items():
         if t == 0:
+            # Startzustand: nur tatsächlicher Strain, Expected-Werte noch nicht verfügbar
             strain0, _, _ = Calc_updated.cut_metrics(Gsnap, S, d)
             metrics[name]["strain"].append(strain0)
-            metrics[name]["exp_exact"].append(np.nan)  # in Plot maskiert
-            metrics[name]["exp_alt"].append(np.nan)
+            metrics[name]["exp_exact"].append(np.nan)          # im Chart ab t=1 sichtbar
+            metrics[name]["exp_alt"].append(np.nan)            # noch nicht berechnet
+            metrics[name]["exp_alt_last_step"].append(None)    # Marker: nie berechnet
+            continue
+
+        # Wenn kein erfolgreicher Flip, Werte übernehmen
+        if not changed_flags[t]:
+            metrics[name]["strain"].append(metrics[name]["strain"][t-1])
+            metrics[name]["exp_exact"].append(metrics[name]["exp_exact"][t-1])
+            metrics[name]["exp_alt"].append(metrics[name]["exp_alt"][t-1])
+            metrics[name]["exp_alt_last_step"].append(metrics[name]["exp_alt_last_step"][t-1])
+            continue
+
+        # --- Welche Größen sind in Schritt t fällig?
+        need_actual_t = (t % actual_period == 0)
+        need_exact_t  = (t % exact_period  == 0)
+        need_alt_t    = (compute_alt and (t % alt_period == 0))
+
+        # --- Für EXPECTED(t) brauchen wir ACTUAL(t-1) (immer frisch berechnet)
+        prev_strain_for_exact = None
+        if need_exact_t:
+            prev_strain_for_exact, _, _ = Calc_updated.cut_metrics(graphs[t-1], S, d)
+
+        # --- ACTUAL(t) berechnen, wenn:
+        #     - ACTUAL(t) fällig ist, oder
+        #     - EXPECTED(t) fällig ist (dann wollen wir ACTUAL(t) ebenfalls speichern), oder
+        #     - ALTERNATIVE(t) fällig ist (falls diese Formel ACTUAL(t) braucht)
+        strain_t = None
+        if need_actual_t or need_exact_t or need_alt_t:
+            strain_t, _, _ = Calc_updated.cut_metrics(Gsnap, S, d)
+
+        # --- ACTUAL(t) in Zeitreihe schreiben
+        if need_actual_t or need_exact_t:
+            # Wenn Expected fällig ist, wird ACTUAL(t) auch gespeichert (siehe Anforderung)
+            metrics[name]["strain"].append(strain_t if strain_t is not None else metrics[name]["strain"][t-1])
         else:
-            if changed_flags[t]:
-                strain, _, _ = Calc_updated.cut_metrics(Gsnap, S, d)
-                exp_exact = Calc_updated.expected_cut_strain_exact(Gsnap, S, d, strain)
-                exp_alt   = Calc_updated.calculate_expected_cut_strain_alternative(Gsnap, S, d, strain)
-                metrics[name]["strain"].append(strain)
-                metrics[name]["exp_exact"].append(exp_exact)
-                metrics[name]["exp_alt"].append(exp_alt)
-            else:
-                # Graph unverändert: Werte einfach übernehmen
-                metrics[name]["strain"].append(metrics[name]["strain"][t-1])
-                metrics[name]["exp_exact"].append(metrics[name]["exp_exact"][t-1])
-                metrics[name]["exp_alt"].append(metrics[name]["exp_alt"][t-1])
-    current_step_plot += 1
-    print("plotting: ",(current_step_plot*100)/amount_of_plots, "%")
+            metrics[name]["strain"].append(metrics[name]["strain"][t-1])
 
+        # --- EXPECTED_exact(t): nutzt ACTUAL(t-1)
+        if need_exact_t:
+            exp_exact_t = Calc_updated.expected_cut_strain_exact(Gsnap, S, d, prev_strain_for_exact)
+            metrics[name]["exp_exact"].append(exp_exact_t)
+        else:
+            metrics[name]["exp_exact"].append(metrics[name]["exp_exact"][t-1])
+
+        # --- EXPECTED_alt(t): optional + periodisch (weiterhin mit ACTUAL(t))
+        if need_alt_t:
+            # strain_t ist oben ggf. schon berechnet, sonst jetzt:
+            if strain_t is None:
+                strain_t, _, _ = Calc_updated.cut_metrics(Gsnap, S, d)
+            exp_alt_t = Calc_updated.calculate_expected_cut_strain_alternative(Gsnap, S, d, strain_t)
+            metrics[name]["exp_alt"].append(exp_alt_t)
+            metrics[name]["exp_alt_last_step"].append(t)
+        else:
+            metrics[name]["exp_alt"].append(metrics[name]["exp_alt"][t-1])
+            metrics[name]["exp_alt_last_step"].append(metrics[name]["exp_alt_last_step"][t-1])
     
-'''              
-# Schritt 0: nur den tatsächlichen Strain berechnen
-G0snap = graphs[0]
-for name, S in CUTS.items():
-    strain0, _, _ = Calc_updated.cut_metrics(G0snap, S, d)
-    metrics[name]["strain"].append(strain0)
-
-# Ab Schritt 1: Strain + Expected-Werte anhängen
-for Gsnap in graphs[1:]:
-    for name, S in CUTS.items():
-        strain, _, _ = Calc_updated.cut_metrics(Gsnap, S, d)
-        exp_exact = Calc_updated.expected_cut_strain_exact(Gsnap, S, d, strain)
-        exp_alt   = Calc_updated.calculate_expected_cut_strain_alternative(Gsnap, S, d, strain)
-        metrics[name]["strain"].append(strain)
-        metrics[name]["exp_exact"].append(exp_exact)
-        metrics[name]["exp_alt"].append(exp_alt)
-'''  
+    # Fortschritt alle ~1% (mind. alle 1 Versuche)
+    report_every = max(1, amount_of_plots // 100)
+    if current_step_plot % report_every == 0:
+        percentage = (current_step_plot * 100.0) / amount_of_plots
+        print(f"{percentage:.0f} %  |  plotting: {amount_of_plots}")
+    
 # =========================
 # Plot-Layout: links 3 Charts (pro Cut), optional rechts Graph; Info oben
 # =========================
@@ -192,45 +245,40 @@ else:
     ax_cut1  = fig.add_subplot(gs[1, 0])
     ax_cut2  = fig.add_subplot(gs[2, 0], sharex=ax_cut1)
     ax_cut3  = fig.add_subplot(gs[3, 0], sharex=ax_cut1)
-    ax_graph = None  # WICHTIG: signalisiert "kein Graph zeichnen"
+    ax_graph = None  # signalisiert "kein Graph zeichnen"
 
-# --- Helper zum Plotten der 3 Kennzahlen pro Cut ---
+# --- Helper zum Plotten (nur 2 Kurven je Chart) ---
 def plot_cut_metrics(ax, name, show_xlabel=False):
     y_strain = metrics[name]["strain"]
     y_exact  = metrics[name]["exp_exact"]
-    y_alt    = metrics[name]["exp_alt"]
 
-    # Erwartete Werte bei Schritt 0 im Plot ausblenden (Linien starten bei 1)
+    # Erwartete Werte bei Schritt 0 im Plot ausblenden (Linie startet bei 1)
     y_exact_plot = np.array(y_exact, dtype=float)
-    y_alt_plot   = np.array(y_alt, dtype=float)
     if len(y_exact_plot) > 0:
         y_exact_plot[0] = np.nan
-    if len(y_alt_plot) > 0:
-        y_alt_plot[0] = np.nan
 
-    l1, = ax.plot(steps, y_strain,      label="Actual Cut Strain")
-    l2, = ax.plot(steps, y_exact_plot,  label="Expected Cut Strain (Giakkoupis)")
-    l3, = ax.plot(steps, y_alt_plot,    label="Expected Cut Strain (alternative)")
+    l1, = ax.plot(steps, y_strain,     label="Actual Cut Strain")
+    l2, = ax.plot(steps, y_exact_plot, label="Expected Cut Strain (Giakkoupis)")
     ax.set_title(CUT_TITLES.get(name, name))
     ax.grid(True, alpha=0.3)
     ax.set_xlim(0, len(steps) - 1)
     if show_xlabel:
         ax.set_xlabel("Flip-Index")
-    return l1, l2, l3  # <-- Linien-Handles zurückgeben
+    return l1, l2  # nur 2 Handles
 
 # --- Plots setzen ---
-lines_top = plot_cut_metrics(ax_cut1, "biggest")         # <-- Handles für Legende
+lines_top = plot_cut_metrics(ax_cut1, "biggest")         # Handles für Legende
 _ = plot_cut_metrics(ax_cut2, f"block_{k_block}")
 _ = plot_cut_metrics(ax_cut3, "every_second", show_xlabel=True)
 
 ax_cut2.set_ylabel("Wert")
 
-# ---- NUR EINE LEGENDE: figure-weit oben (statt dreimal) ----
+# ---- NUR EINE LEGENDE: figure-weit oben ----
 fig.legend(
     handles=lines_top,
     labels=[ln.get_label() for ln in lines_top],
     loc="upper center", bbox_to_anchor=(0.5, 0.995),
-    ncol=3, frameon=False
+    ncol=2, frameon=False
 )
 
 # Cursor-Linien (aktueller Schritt) in allen drei Charts
@@ -263,8 +311,7 @@ drop_ax = fig.add_axes([
 ])
 
 # Zusätzlich unten: TextBox "Go to step"
-# (Platzierung neben den Buttons, leicht nach links versetzt)
-axbox = plt.axes([0.08, 0.02, 0.18, 0.05])  # <-- Position/Größe der TextBox
+axbox = plt.axes([0.08, 0.02, 0.18, 0.05])
 step_box = TextBox(axbox, 'Go to step: ', initial='0')
 
 # Dropdown-Optionen
@@ -349,19 +396,34 @@ def update_info_panel(i: int):
     title = CUT_TITLES.get(k, k)
 
     val_strain = metrics[k]["strain"][i]
-    # Bei Schritt 0 Expected-Werte als "N/A" anzeigen
-    if i == 0:
+
+    # Expected (exact): bei Schritt 0 "N/A"
+    if i == 0 or not np.isfinite(metrics[k]["exp_exact"][i]):
         val_exact_str = "N/A"
-        val_alt_str   = "N/A"
     else:
         val_exact_str = f"{metrics[k]['exp_exact'][i]:.4f}"
-        val_alt_str   = f"{metrics[k]['exp_alt'][i]:.4f}"
+
+    # Alternative: Wert + letzter Berechnungsschritt (oder deaktiviert)
+    last_alt_step = metrics[k]["exp_alt_last_step"][i]
+    if not compute_alt:
+        val_alt_str = "N/A"
+        alt_suffix = "(deaktiviert)"
+    else:
+        if not np.isfinite(metrics[k]["exp_alt"][i]):
+            val_alt_str = "N/A"
+        else:
+            val_alt_str = f"{metrics[k]['exp_alt'][i]:.4f}"
+
+        if last_alt_step is None:
+            alt_suffix = "(noch nicht berechnet)"
+        else:
+            alt_suffix = f"(zuletzt berechnet bei Schritt {last_alt_step})"
 
     lines = [
         f"Schritt {i}/{len(graphs)-1}   |   Ausgewählter Cut: {title}",
-        f"Actual Cut Strain: {val_strain:.4f}",
-        f"Expected Cut Strain (Giakkoupis): {val_exact_str}",
-        f"Expected Cut Strain (alternative): {val_alt_str}",
+        f"Actual Cut Strain: {val_strain:.4f}  (Interval: {actual_period})",
+        f"Expected Cut Strain (Giakkoupis): {val_exact_str}  (Interval: {exact_period})",
+        f"Expected Cut Strain (alternative): {val_alt_str} {alt_suffix}" + (f"  (Period: {alt_period})" if compute_alt else ""),
         f"Removed: {format_edges(removed_edges)}",
         f"Added:   {format_edges(added_edges)}",
     ]
