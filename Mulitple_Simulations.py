@@ -8,42 +8,8 @@ import Graph
 import Calc_updated
 
 
-"""
-# Auswahl Graph durch User
-print("Choose: 1 = Ring of Cliques ; 2 = Random Graph ; 3 = Ring")
-index_of_graph = int(input()) - 1
-list_of_graphs = ["Ring of Cliques", "Random Graph", "Ring"]
-type_of_graph = list_of_graphs[index_of_graph]
-
-# Einstellungen
-         # alternativ "adjacency"
-# Schwellwert für Expander
-
-# Graph initialisieren
-if type_of_graph == "Ring of Cliques":
-    G, pos = Graph.create_ring_of_cliques(8, 5)
-    cut_set = {f"C1_{i}" for i in range(5)}     # nur noch fürs Zeichnen
-    d = 4
-elif type_of_graph == "Random Graph":
-    G, pos = Graph.create_random_d_regular_graph()
-    cut_set = Graph.generate_random_cut(G)
-    d = Calc_updated.calculate_d(G)
-elif type_of_graph == "Ring":
-    G, pos, n = Graph.create_random_even_cycle_graph(seed=42)
-    d = 2
-    cut_set = Graph.generate_random_cut(G)
-else:
-    raise ValueError("Ungültiger Graph-Typ")
-
-n = len(G.nodes)
-if d > (math.log2(n) ** 2):
-    raise ValueError("d ist zu groß für die Knotenzahl")
-
-"""
-
-
-Gtest = nx.random_regular_graph(4, 200, seed=0)
-print("test spec =", Calc_updated.spectral_gap_normalized_sparse(Gtest, 4))
+# Gtest = nx.random_regular_graph(4, 200, seed=0)
+# print("test spec =", Calc_updated.spectral_gap_normalized_sparse(Gtest, 4))
 
 print("Choose number of nodes:")
 n = int(input())
@@ -73,6 +39,10 @@ G, pos = Graph.create_ring_of_cliques(number_of_cliques, size_of_cliques)
 
 SAMPLING_RATE_HIGH = math.ceil(n/50)      # alle 10 Flips Spektrum messen
 SAMPLING_RATE_LOW = math.ceil(n/5)
+if n >= 5000:
+    # etwa alle n Flips
+    SAMPLING_RATE_HIGH = max(SAMPLING_RATE_HIGH, n)
+    SAMPLING_RATE_LOW = max(SAMPLING_RATE_LOW, 5 * n)
 
 num_simulations = 10
 max_flips = 50000000
@@ -112,7 +82,7 @@ for sim in range(num_simulations):
     print("Simulation", sim + 1, "of", num_simulations)
     current_G = G.copy()
     specvals = []
-    flip_info = []
+    flip_info = [] if draw_graphs else None
     graphs = [copy.deepcopy(current_G)]
 
     spec = Calc_updated.spectral_gap_normalized_sparse(current_G, d)
@@ -129,7 +99,8 @@ for sim in range(num_simulations):
 
     while flips_done < this_upper:
         current_G, removed, added = Graph.flip_operation(current_G)
-        flip_info.append((removed, added))
+        if draw_graphs:
+            flip_info.append((removed, added))
         flips_done += 1
 
         # nur an den Samplingpunkten messen
@@ -137,14 +108,14 @@ for sim in range(num_simulations):
         if high_prescision:
             if flips_done % SAMPLING_RATE_HIGH == 0:
                 spec = Calc_updated.spectral_gap_normalized_sparse(
-                    current_G, d)
+                    current_G, d, tol=5e-3, maxiter=1000)
                 measured_now = True
             if spec >= epsilon:
                 high_prescision = False
         else:
             if flips_done % SAMPLING_RATE_LOW == 0:
                 spec = Calc_updated.spectral_gap_normalized_sparse(
-                    current_G, d)
+                    current_G, d, tol=2e-2, maxiter=300)
                 measured_now = True
 
         if measured_now:
@@ -169,19 +140,21 @@ for sim in range(num_simulations):
         if draw_graphs:
             graphs.append(current_G.copy())
 
-        if flips_done % 1000 == 0:
+        # mindestens alle n Flips, bei großen n noch seltener
+        PROGRESS_EVERY = max(100_000, n)
+        if flips_done % PROGRESS_EVERY == 0:
             pct = (sim * upper_bound + flips_done) / \
                 (num_simulations * upper_bound) * 100
-            print(pct, "percent done, high precision: ", high_prescision)
+            print(f"{pct:.2f} Prozent erledigt")
 
-        # Falls globaler Stopwert schon bekannt ist und erreicht wurde
-        if global_stop_at_flips is not None and flips_done >= global_stop_at_flips:
-            break
+    # Falls globaler Stopwert schon bekannt ist und erreicht wurde
+    if global_stop_at_flips is not None and flips_done >= global_stop_at_flips:
+        break
 
     simulations.append({
-        "graphs": graphs,
+        "graphs": graphs if draw_graphs else None,
         "specvals": specvals,
-        "flip_info": flip_info,
+        "flip_info": flip_info if draw_graphs else None,
     })
     all_specs.append(specvals)
 
