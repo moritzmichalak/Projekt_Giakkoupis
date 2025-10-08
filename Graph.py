@@ -135,6 +135,45 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
     return G, pos
 
 # Flip operation according to Giakkoupis paper.
+def flip_operation(G, num_cliques, size_of_cliques, rng=random):
+    # 1) Zufälligen Knoten label-basiert wählen (O(1))
+    i = rng.randrange(num_cliques)
+    j = rng.randrange(size_of_cliques)
+    a = f"{i}_{j}"
+    # if a not in G:  # sehr defensiv
+    # a = rng.choice(tuple(G.nodes()))
+
+    # 2) Zufälligen Nachbarn b von a wählen (O(d))
+    Na_view = G.adj[a]
+    if not Na_view:  # sollte in d-regulär nie passieren
+        return G, None, None
+    b = rng.choice(tuple(Na_view))
+
+    # 3) Nachbarschaften als Sets (einmal)
+    Na = set(Na_view)
+    Nb = set(G.adj[b])
+
+    # Erlaubte Kandidaten gleich berechnen (reduziert Rejections)
+    allowed_A = Na - {b} - Nb          # a' ∈ N(a)\{b}\N(b)
+    if not allowed_A:
+        return G, None, None
+    allowed_B = Nb - {a} - Na          # b' ∈ N(b)\{a}\N(a)
+    if not allowed_B:
+        return G, None, None
+
+    a_prime = rng.choice(tuple(allowed_A))
+    b_prime = rng.choice(tuple(allowed_B))
+
+    # 4) Flip durchführen (Grad bleibt erhalten)
+    G.remove_edge(a, a_prime)
+    G.remove_edge(b, b_prime)
+    G.add_edge(a, b_prime)
+    G.add_edge(b, a_prime)
+
+    return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}
+
+r'''
+# Flip operation according to Giakkoupis paper.
 def flip_operation(G):
     # Kein deepcopy hier – wir mutieren G nur bei Erfolg.
     # 1) zufällige (ungerichtete) Kante wählen
@@ -164,8 +203,9 @@ def flip_operation(G):
     else:
         # kein Flip – G bleibt unverändert
         return G, None, None
-
 '''
+
+r'''
 def flip_operation(G):
     # 1. Choose an (ordered) pair of adjacent vertices a,b in V (this is the hub-edge)
     a, b = random.choice(list(G.edges))
