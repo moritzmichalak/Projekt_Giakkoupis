@@ -30,10 +30,10 @@ def create_random_even_cycle_graph(seed=None):
 
 
 def generate_cut_1(G):
-    # Jede zweite Clique: wähle alle Knoten, deren Clique-ID (vor dem '_') gerade ist
+    # Jede zweite Clique: wähle alle Knoten, deren Clique-ID (vor dem Unterstrich) gerade ist
     S = set()
     for node in G.nodes():
-        clique_id = int(str(node).split('_')[0])  # <-- korrektes Parsen
+        clique_id = int(str(node).split('_')[0])  
         if clique_id % 2 == 0:
             S.add(node)
     return S
@@ -146,7 +146,7 @@ def flip_operation(G, num_cliques, size_of_cliques, rng=random):
     # 2) Zufälligen Nachbarn b von a wählen (O(d))
     Na_view = G.adj[a]
     if not Na_view:  # sollte in d-regulär nie passieren
-        return G, None, None
+        return G, None, None, None
     b = rng.choice(tuple(Na_view))
 
     # 3) Nachbarschaften als Sets (einmal)
@@ -156,10 +156,10 @@ def flip_operation(G, num_cliques, size_of_cliques, rng=random):
     # Erlaubte Kandidaten gleich berechnen (reduziert Rejections)
     allowed_A = Na - {b} - Nb          # a' ∈ N(a)\{b}\N(b)
     if not allowed_A:
-        return G, None, None
+        return G, None, None, None
     allowed_B = Nb - {a} - Na          # b' ∈ N(b)\{a}\N(a)
     if not allowed_B:
-        return G, None, None
+        return G, None, None, None
 
     a_prime = rng.choice(tuple(allowed_A))
     b_prime = rng.choice(tuple(allowed_B))
@@ -170,7 +170,7 @@ def flip_operation(G, num_cliques, size_of_cliques, rng=random):
     G.add_edge(a, b_prime)
     G.add_edge(b, a_prime)
 
-    return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}
+    return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}, (a, b)
 
 r'''
 # Flip operation according to Giakkoupis paper.

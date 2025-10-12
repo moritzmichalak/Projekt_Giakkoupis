@@ -16,7 +16,8 @@ def cut_metrics(G, S, d):
                 cut_edges.add((u, v))
     cut_size = len(cut_edges)
     min_subset = min(len(S), len(V - S))
-    conductance = cut_size / (d * min_subset) if min_subset > 0 else 0
+    # conductance = cut_size / (d * min_subset) if min_subset > 0 else 0
+    conductance = 0
 
     # Berechne Cut Strain:
     strain = 0
@@ -31,6 +32,9 @@ def cut_metrics(G, S, d):
     return strain, conductance, cut_edges
 
 # Compute all possible regular degrees d > 2 for a graph with n nodes.
+
+#def calculate_expected_cut_size(n):
+    
 
 
 def calculate_possible_d(n):
