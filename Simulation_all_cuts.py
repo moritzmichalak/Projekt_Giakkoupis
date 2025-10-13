@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, TextBox, RadioButtons
 from collections import OrderedDict
 import numpy as np
+from matplotlib.lines import Line2D
 
 import Graph
 import Calc_updated
@@ -96,8 +97,8 @@ if compute_alt:
         50
     )
 
-# --- δ für die Expected Cut Size Schranke (Default 1/d) ---
-delta_cut_size  = 1.0 / d
+# --- δ für die Expected Cut Size Schranke  ---
+delta_cut_size = 1.0 / d
 
 # =========================
 # Drei Cuts (in gewünschter Reihenfolge)
@@ -109,9 +110,9 @@ CUTS = OrderedDict([
 ])
 
 CUT_TITLES = {
-    "biggest": "Biggest Cut",
-    f"block_{k_block}": f"Block-Cut (k = {k_block})",
-    "every_second": "Jede zweite Clique",
+    "biggest": f"Big Cut | n: {n}",
+    f"block_{k_block}": f"Smallest Cut (Block-Cut, k = {k_block}) |  n: {n}",
+    "every_second": f"Every second Clique | n: {n}",
 }
 
 # --- Smallest-Cut bestimmen (für LB-Prüfung)
@@ -184,6 +185,13 @@ for t in range(1, upper_bound + 1):
         for name, S in CUTS.items():
             prev_strain_for_exact[name] = Calc_updated.cut_metrics(current_G, S, d)[0]
 
+    # --- NEU: Für ALTERNATIVE(t) ebenfalls den ACTUAL(t-1) vormerken (Forecast für t+1)
+    prev_strain_for_alt = {}
+    if compute_alt and (t % alt_period == 0):
+        for name, S in CUTS.items():
+            prev_strain_for_alt[name] = Calc_updated.cut_metrics(current_G, S, d)[0]
+
+
     # --- FLIP durchführen (mit hub-edge)
     current_G, removed, added, hub = Graph.flip_operation(current_G, number_of_cliques, size_of_cliques)
     changed = (removed is not None and added is not None)
@@ -212,10 +220,8 @@ for t in range(1, upper_bound + 1):
             metrics[name]["exp_alt"].append(metrics[name]["exp_alt"][t-1])
             metrics[name]["exp_alt_last_step"].append(metrics[name]["exp_alt_last_step"][t-1])
             metrics[name]["cut_size"].append(metrics[name]["cut_size"][t-1])
-            # Für Nicht-LB-Cuts: exp_cut_size_lb ggf. auf NaN auffüllen
             if name != LB_TRACK_KEY:
                 metrics[name]["exp_cut_size_lb"].append(np.nan)
-            # LB-Flag (dieser Schritt)
             metrics[name]["under_lb_flag"].append(False)
             continue
 
@@ -224,7 +230,7 @@ for t in range(1, upper_bound + 1):
         need_exact_t  = (compute_exact and (t % exact_period == 0))
         need_alt_t    = (compute_alt and (t % alt_period == 0))
 
-        # ACTUAL(t) & CUTSIZE(t) (CutSize brauchen wir immer fortlaufend)
+        # ACTUAL(t) & CUTSIZE(t)
         strain_t, _, cut_edges_t = Calc_updated.cut_metrics(current_G, S, d)
         cut_size_t = len(cut_edges_t)
 
@@ -245,9 +251,11 @@ for t in range(1, upper_bound + 1):
         else:
             metrics[name]["exp_exact"].append(metrics[name]["exp_exact"][t-1])
 
-        # EXPECTED_alt(t): optional + periodisch
+        # NEU (Forecast): nutze den vor dem Flip gemerkten ACTUAL(t-1)
         if need_alt_t:
-            exp_alt_t = Calc_updated.calculate_expected_cut_strain_alternative(current_G, S, d, strain_t)
+            exp_alt_t = Calc_updated.calculate_expected_cut_strain_alternative(
+                current_G, S, d, prev_strain_for_alt[name]
+            )
             metrics[name]["exp_alt"].append(exp_alt_t)
             metrics[name]["exp_alt_last_step"].append(t)
         else:
@@ -266,7 +274,6 @@ for t in range(1, upper_bound + 1):
                 # Hub-Edge vor dem Flip im Cut?
                 hub_in_cut = ((a, b) in pre_cut_edges_LB) or ((b, a) in pre_cut_edges_LB)
                 if hub_in_cut:
-                    # Schwelle basiert auf c_prev_LB (vor dem Flip) mit "+"-Formel:
                     threshold = metrics[LB_TRACK_KEY]["lb_last_threshold"][-1]
                     if np.isfinite(threshold) and (cut_size_t < threshold):
                         under_lb = True
@@ -295,8 +302,8 @@ if visualize_graph:
     gs = fig.add_gridspec(
         nrows=4, ncols=2,
         width_ratios=[1.0, 1.0],
-        height_ratios=[0.50, 1.0, 1.0, 1.0],
-        left=0.05, right=0.98, bottom=0.10, top=0.95,
+        height_ratios=[0.55, 1.0, 1.0, 1.0],
+        left=0.05, right=0.98, bottom=0.10, top=0.98,
         wspace=0.25, hspace=0.25
     )
     # Links: drei Strain-Charts
@@ -320,26 +327,30 @@ if visualize_graph:
         ax.set_visible(False)
 
 else:
-    # Keine Graph-Visualisierung: Info über beide Spalten
+    # Keine Graph-Visualisierung: Info links und rechts getrennt, Cut-Size-Charts rechts
     gs = fig.add_gridspec(
         nrows=4, ncols=2,
         width_ratios=[1.0, 1.0],
-        height_ratios=[0.50, 1.0, 1.0, 1.0],
-        left=0.05, right=0.98, bottom=0.10, top=0.95,
+        height_ratios=[0.55, 1.0, 1.0, 1.0],
+        left=0.05, right=0.98, bottom=0.10, top=0.98,
         wspace=0.25, hspace=0.25
     )
-    ax_info = fig.add_subplot(gs[0, :])
+
+    # Info-Panel jetzt ZWEI Achsen (keine gemeinsame!)
+    ax_info_left  = fig.add_subplot(gs[0, 0])
+    ax_info_right = fig.add_subplot(gs[0, 1])
+
+    # Links: drei Strain-Charts
     ax_cut1  = fig.add_subplot(gs[1, 0])
     ax_cut2  = fig.add_subplot(gs[2, 0], sharex=ax_cut1)
     ax_cut3  = fig.add_subplot(gs[3, 0], sharex=ax_cut1)
+
+    # Rechts: drei Cut-Size-Charts
     ax_size1 = fig.add_subplot(gs[1, 1], sharex=ax_cut1)
     ax_size2 = fig.add_subplot(gs[2, 1], sharex=ax_cut1)
     ax_size3 = fig.add_subplot(gs[3, 1], sharex=ax_cut1)
-    ax_graph = None
 
-    # Im No-Graph-Fall zeigen beide Variablen auf dieselbe Info-Achse
-    ax_info_left  = ax_info
-    ax_info_right = ax_info
+    ax_graph = None  # es gibt keinen Graph rechts
 
 # Beide Info-Achsen „unsichtbar“
 ax_info_left.set_axis_off()
@@ -363,7 +374,14 @@ def plot_cut_metrics(ax, name, show_xlabel=False):
         l2, = ax.plot(steps, y_exact_plot, label="Expected Cut Strain (Giakkoupis)")
         lines.append(l2)
 
-    ax.set_title(CUT_TITLES.get(name, name))
+    # Ø-Linie (hellgrau, gestrichelt) – kein Eintrag in der Legende
+    try:
+        avg_strain = float(np.nanmean(y_strain))
+        ax.axhline(avg_strain, color="#9e0606", linestyle="--", linewidth=1.0, zorder=0, label="_nolegend_")
+    except Exception:
+        pass
+
+    ax.set_title(CUT_TITLES.get(name, name), fontsize=10)
     ax.grid(True, alpha=0.3)
     if len(steps) > 1:
         ax.set_xlim(0, len(steps) - 1)
@@ -374,10 +392,19 @@ def plot_cut_metrics(ax, name, show_xlabel=False):
         ax.set_xlabel("Flip-Index")
     return tuple(lines)
 
+
 def plot_cut_sizes(ax, name, show_xlabel=False):
     y_size = metrics[name]["cut_size"]
-    ax.plot(steps, y_size)
-    ax.set_title(CUT_TITLES.get(name, name) + " – Cut Size")
+    ax.plot(steps, y_size, color="green", label="Cut Size")
+
+    # Ø-Linie (hellgrau, gestrichelt) – kein Eintrag in der Legende
+    try:
+        avg_size = float(np.nanmean(y_size))
+        ax.axhline(avg_size, color="#9e0606", linestyle="--", linewidth=1.0, zorder=0, label="_nolegend_")
+    except Exception:
+        pass
+
+    ax.set_title(CUT_TITLES.get(name, name) + " – Cut Size", fontsize=10)
     ax.grid(True, alpha=0.3)
     if len(steps) > 1:
         ax.set_xlim(0, len(steps) - 1)
@@ -387,11 +414,12 @@ def plot_cut_sizes(ax, name, show_xlabel=False):
         ax.set_xlabel("Flip-Index")
     ax.set_ylabel("Cut Size")
 
+
 # Strain Plots links
 lines_top = plot_cut_metrics(ax_cut1, "biggest")
 _ = plot_cut_metrics(ax_cut2, f"block_{k_block}")
 _ = plot_cut_metrics(ax_cut3, "every_second", show_xlabel=True)
-ax_cut2.set_ylabel("Wert")
+ax_cut2.set_ylabel("Cut Strain", labelpad=6)
 
 # Size Plots (rechts unten – sichtbar nur ohne Graph; mit Graph via View)
 plot_cut_sizes(ax_size1, "biggest")
@@ -401,24 +429,27 @@ if visualize_graph:
     for ax in (ax_size1, ax_size2, ax_size3):
         ax.set_visible(False)
 
-# Eine Legende (oben), dynamisch nach Anzahl Linien
-legend_handles = list(lines_top)
+# Gemeinsame Legende (Cut Strain / Expected / Cut Size) unten rechts, vertikal
+legend_handles = list(lines_top)  # enthält: Actual Cut Strain (+ ggf. Expected Giakkoupis)
+# Proxy-Handle für Cut Size (grün)
+legend_handles.append(Line2D([0], [0], color='green', label='Cut Size'))
+
 fig.legend(
     handles=legend_handles,
-    labels=[ln.get_label() for ln in legend_handles],
-    loc="upper center", bbox_to_anchor=(0.5, 0.995),
-    ncol=len(legend_handles), frameon=False
+    labels=[h.get_label() for h in legend_handles],
+    loc="lower right", bbox_to_anchor=(0.995, 0.01),
+    ncol=1, frameon=False, prop={'size': 9}, borderaxespad=0.0
 )
 
 # Cursor-Linien (Strain)
-cursor1 = ax_cut1.axvline(x=0, linestyle="--", color="grey", linewidth=1)
-cursor2 = ax_cut2.axvline(x=0, linestyle="--", color="grey", linewidth=1)
-cursor3 = ax_cut3.axvline(x=0, linestyle="--", color="grey", linewidth=1)
+cursor1 = ax_cut1.axvline(x=0, linestyle="--", color="black", linewidth=1)
+cursor2 = ax_cut2.axvline(x=0, linestyle="--", color="black", linewidth=1)
+cursor3 = ax_cut3.axvline(x=0, linestyle="--", color="black", linewidth=1)
 
 # Cursor-Linien (Size)
-cursor_s1 = ax_size1.axvline(x=0, linestyle="--", color="grey", linewidth=1)
-cursor_s2 = ax_size2.axvline(x=0, linestyle="--", color="grey", linewidth=1)
-cursor_s3 = ax_size3.axvline(x=0, linestyle="--", color="grey", linewidth=1)
+cursor_s1 = ax_size1.axvline(x=0, linestyle="--", color="black", linewidth=1)
+cursor_s2 = ax_size2.axvline(x=0, linestyle="--", color="black", linewidth=1)
+cursor_s3 = ax_size3.axvline(x=0, linestyle="--", color="black", linewidth=1)
 
 # =========================
 # Info-Panel + Controls (rechts andocken)
@@ -542,7 +573,7 @@ axbox = plt.axes([0.08, 0.02, 0.18, 0.05])
 step_box = TextBox(axbox, 'Go to step: ', initial='0')
 
 # =========================
-# Zeichenfunktionen
+# Zeichenfunktionen & Stats-Helper
 # =========================
 def draw_graph_at_step(i: int):
     if not visualize_graph or ax_graph is None or not ax_graph.get_visible():
@@ -588,6 +619,29 @@ def format_edges(edges_set):
         seq = list(edges_set)
     return ", ".join([f"({u},{v})" for (u, v) in seq])
 
+def _compute_diff_stats(actual_arr, expected_arr, step_mask):
+    """Gibt (avg_abs_dev, over_count, under_count, equal_count, n_used) zurück."""
+    diffs = []
+    over = under = equal = 0
+    for i, use in enumerate(step_mask):
+        if not use:
+            continue
+        a = actual_arr[i]
+        e = expected_arr[i]
+        if not (np.isfinite(a) and np.isfinite(e)):
+            continue
+        d = e - a
+        diffs.append(abs(d))
+        if np.isclose(d, 0.0):
+            equal += 1
+        elif d > 0:
+            over += 1
+        else:
+            under += 1
+    n_used = over + under + equal
+    avg_abs = float(np.mean(diffs)) if diffs else np.nan
+    return avg_abs, over, under, equal, n_used
+
 def update_info_panel(i: int):
     # Beide Info-Achsen leeren
     ax_info_left.clear();  ax_info_left.set_axis_off()
@@ -600,81 +654,108 @@ def update_info_panel(i: int):
     val_strain = metrics[k]["strain"][i]
     val_csize  = metrics[k]["cut_size"][i]
 
-    # Expected (exact): Anzeige abhängig von compute_exact
+    # Expected (exact)
     if not compute_exact:
-        val_exact_str = "N/A"
-        exact_suffix = "(deaktiviert)"
+        val_exact_str = "N/A"; exact_suffix = "(deaktiviert)"
     else:
         if i == 0 or not np.isfinite(metrics[k]["exp_exact"][i]):
-            val_exact_str = "N/A"
-            exact_suffix = f"(Interval: {exact_period})"
+            val_exact_str = "N/A"; exact_suffix = f"(Interval: {exact_period})"
         else:
-            val_exact_str = f"{metrics[k]['exp_exact'][i]:.4f}"
-            exact_suffix = f"(Interval: {exact_period})"
+            val_exact_str = f"{metrics[k]['exp_exact'][i]:.4f}"; exact_suffix = f"(Interval: {exact_period})"
 
     # Alternative
     last_alt_step = metrics[k]["exp_alt_last_step"][i]
     if not compute_alt:
-        val_alt_str = "N/A"
-        alt_suffix = "(deaktiviert)"
+        val_alt_str = "N/A"; alt_suffix = "(deaktiviert)"
     else:
-        if not np.isfinite(metrics[k]["exp_alt"][i]):
-            val_alt_str = "N/A"
-        else:
-            val_alt_str = f"{metrics[k]['exp_alt'][i]:.4f}"
-        if last_alt_step is None:
-            alt_suffix = "(noch nicht berechnet)"
-        else:
-            alt_suffix = f"(zuletzt berechnet bei Schritt {last_alt_step}; Period: {alt_period})"
+        val_alt_str = "N/A" if not np.isfinite(metrics[k]["exp_alt"][i]) else f"{metrics[k]['exp_alt'][i]:.4f}"
+        alt_suffix = "(noch nicht berechnet)" if last_alt_step is None else f"(zuletzt bei Schritt {last_alt_step}; Period: {alt_period})"
+
+    # Ø über die gesamte Zeitreihe (NaNs werden ignoriert)
+    try:
+        avg_strain_sel = float(np.nanmean(metrics[k]["strain"]))
+    except Exception:
+        avg_strain_sel = float("nan")
+    try:
+        avg_csize_sel = float(np.nanmean(metrics[k]["cut_size"]))
+    except Exception:
+        avg_csize_sel = float("nan")
+
+    # Basiszeilen (kompakt) – Actual + CutSize in eine Zeile
+    line_actual = (
+        f"Actual Cut Strain: {val_strain:.4f}  (Interval: {actual_period})  (Ø = "
+        f"{'N/A' if not np.isfinite(avg_strain_sel) else f'{avg_strain_sel:.4f}'})  |  "
+        f"Cut Size: {val_csize}  (Ø = "
+        f"{'N/A' if not np.isfinite(avg_csize_sel) else f'{avg_csize_sel:.4f}'})  |  "
+        f"n: {n}"
+    )
 
     lines = [
         f"Schritt {i}/{total_steps}   |   Ausgewählter Cut: {title}",
-        f"Actual Cut Strain: {val_strain:.4f}  (Interval: {actual_period})",
+        line_actual,
         f"Expected Cut Strain (Giakkoupis): {val_exact_str} {exact_suffix}",
         f"Expected Cut Strain (alternative): {val_alt_str} {alt_suffix}",
-        "",
-        f"Cut Size c_G'(S): {val_csize}",
     ]
 
-    # --- LB-Infos NUR anzeigen, wenn der ausgewählte Cut der smallest cut ist
+    # --- LB-Infos (nur zeigen, wenn der ausgewählte Cut der smallest cut ist) ---
     if selected_cut_key[0] == LB_TRACK_KEY:
-        # aktuelle per-step Schwelle (vor dem Flip berechnet; für i=0 meist NaN)
         try:
             lb_step_val = metrics[LB_TRACK_KEY]["exp_cut_size_lb"][i]
         except Exception:
             lb_step_val = np.nan
-
         viol_steps = metrics[LB_TRACK_KEY].get("lb_violations_steps", [])
         viol_count = len(viol_steps)
         viol_list_str = ", ".join(map(str, viol_steps)) if viol_steps else "-"
 
+        # Diese Zeile kommt FRÜH, damit sie sicher links bleibt
+        lines.append(f"LB violations (smallest cut): {viol_count}  |  Steps: {viol_list_str}")
+        # Zusatzinfos zur LB direkt dahinter
         lines += [
-            f"LB check active?  {'YES' if LB_ELIGIBLE else 'no'}  (initial cut size = {c0_init}, d = {d})",
-            f"LB per-step threshold (only if hub-edge crosses): c_prev + 2*(1 + δ*c_prev), δ={delta_cut_size}",
-            f"Threshold this step (smallest cut): {('N/A' if not np.isfinite(lb_step_val) else f'{lb_step_val:.2f}')}",
-            f"LB violations so far (smallest cut): {viol_count}  |  Steps: {viol_list_str}",
-            "",
+            f"LB active?  {'YES' if LB_ELIGIBLE else 'no'}  (initial cut size = {c0_init}, d = {d})",
+            f"LB threshold (this step, if hub-edge crosses): {('N/A' if not np.isfinite(lb_step_val) else f'{lb_step_val:.2f}')}  |  δ={delta_cut_size}",
         ]
 
-    # Flip-Edges (immer)
+    # --- Abweichungs-Statistiken (nur für ausgewählten Cut), je Block als EINE Zeile ---
+    def _fmt_avg(x): return "N/A" if not np.isfinite(x) else f"{x:.6f}"
+
+    if compute_exact:
+        mask_exact = [(t > 0) and changed_flags[t] and (t % exact_period == 0) for t in range(len(steps))]
+        avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[k]["strain"], metrics[k]["exp_exact"], mask_exact)
+        lines.append(
+            f"Giakkoupis vs Actual: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
+        )
+
+    if compute_alt:
+        mask_alt = [(t > 0) and changed_flags[t] and (t % alt_period == 0) for t in range(len(steps))]
+        avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[k]["strain"], metrics[k]["exp_alt"], mask_alt)
+        lines.append(
+            f"Alternative vs Actual: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
+        )
+
+    if compute_exact and compute_alt:
+        mask_both = [(t > 0) and changed_flags[t] and (t % exact_period == 0) and (t % alt_period == 0) for t in range(len(steps))]
+        avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[k]["exp_exact"], metrics[k]["exp_alt"], mask_both)
+        lines.append(
+            f"Giakkoupis vs Alternative: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
+        )
+
+    # Flip-Edges (immer ans Ende)
     lines += [
         f"Removed: {format_edges(removed_edges)}",
         f"Added:   {format_edges(added_edges)}",
     ]
 
-    # --- Zweispaltiges Layout: Links erste 7, rechts der Rest ---
+    # --- Zweispaltiges Layout: Links erste N, rechts der Rest ---
+    # Tipp: je nach Textmenge ggf. 7 -> 8 anpassen
     split_at = 7
     left_lines  = lines[:split_at]
     right_lines = lines[split_at:]
 
-    # Linke Spalte
-    ax_info_left.text(0.01, 0.95, "\n".join(left_lines),
-                      va="top", ha="left", fontsize=10)
-
-    # Rechte Spalte
+    ax_info_left.text(0.01, 0.95, "\n".join(left_lines),  va="top", ha="left", fontsize=10)
     if right_lines:
-        ax_info_right.text(0.02, 0.95, "\n".join(right_lines),
-                           va="top", ha="left", fontsize=10)
+        ax_info_right.text(0.02, 0.95, "\n".join(right_lines), va="top", ha="left", fontsize=10)
+
+
 
 # =========================
 # Navigation + View
