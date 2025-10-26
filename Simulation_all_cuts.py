@@ -722,21 +722,21 @@ def update_info_panel(i: int):
         mask_exact = [(t > 0) and changed_flags[t] and (t % exact_period == 0) for t in range(len(steps))]
         avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[k]["strain"], metrics[k]["exp_exact"], mask_exact)
         lines.append(
-            f"Giakkoupis vs Actual: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
+            f"Actual Strain - Exp. Strain Giakkoupis: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
         )
 
     if compute_alt:
         mask_alt = [(t > 0) and changed_flags[t] and (t % alt_period == 0) for t in range(len(steps))]
         avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[k]["strain"], metrics[k]["exp_alt"], mask_alt)
         lines.append(
-            f"Alternative vs Actual: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
+            f"Actual Strain - Exp. Strain Alt.: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
         )
 
     if compute_exact and compute_alt:
         mask_both = [(t > 0) and changed_flags[t] and (t % exact_period == 0) and (t % alt_period == 0) for t in range(len(steps))]
         avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[k]["exp_exact"], metrics[k]["exp_alt"], mask_both)
         lines.append(
-            f"Giakkoupis vs Alternative: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
+            f"Exp. Strain Giakkoupis- Exp. Strain Alt.: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
         )
 
     # Flip-Edges (immer ans Ende)
