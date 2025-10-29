@@ -33,8 +33,7 @@ def cut_metrics(G, S, d):
 
 # Compute all possible regular degrees d > 2 for a graph with n nodes.
 
-#def calculate_expected_cut_size(n):
-    
+# def calculate_expected_cut_size(n):
 
 
 def calculate_possible_d(n):
@@ -45,15 +44,16 @@ def calculate_possible_d(n):
             possible_d.append(i)
     return possible_d
 
+
 def calculate_expected_cut_strain_alternative(G, S, d, strain):
     V = set(G.nodes)
     n = len(V)
     m = G.number_of_edges()
     neighbors = {u: set(G.neighbors(u)) for u in G.nodes()}
-    #expected_cut_strain_alternative = 0
+    # expected_cut_strain_alternative = 0
     # cut_strain_scenario = strain
     strains_a_prime = 0
-    #sum_counter = 0
+    # sum_counter = 0
     counter = 0
     for a, b in G.edges:  # number of iterations: m
         Na = neighbors[a]
@@ -69,67 +69,90 @@ def calculate_expected_cut_strain_alternative(G, S, d, strain):
                     # The cut runs between a and b OR a' and b' => flip-operation changes cut strain.
                     if ((a in S) ^ (b in S)) or ((a_prime in S) ^ (b_prime in S)):
                         # Calculate old values:
-                        alpha_a        = len(Na.intersection(S)) / len(Na)
-                        alpha_b        = len(Nb.intersection(S)) / len(Nb)
-                        alpha_a_prime  = len(Na_prime.intersection(S)) / len(Na_prime)
-                        alpha_b_prime  = len(Nb_prime.intersection(S)) / len(Nb_prime)
+                        alpha_a = len(Na.intersection(S)) / len(Na)
+                        alpha_b = len(Nb.intersection(S)) / len(Nb)
+                        alpha_a_prime = len(
+                            Na_prime.intersection(S)) / len(Na_prime)
+                        alpha_b_prime = len(
+                            Nb_prime.intersection(S)) / len(Nb_prime)
                         # Substract old values
-                        strain_b_prime -= (alpha_a * (1 - alpha_a) + alpha_b * (1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
+                        strain_b_prime -= (alpha_a * (1 - alpha_a) + alpha_b * (1 - alpha_b) + alpha_a_prime * (
+                            1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
                         # Calculate new values:
-                        if (a in S) and (b not in S) and (a_prime in S) and (b_prime not in S): # I
-                            alpha_a        = (len(Na.intersection(S)) -1) / len(Na)
-                            alpha_b        = (len(Nb.intersection(S)) +1) / len(Nb)
-                            alpha_a_prime  = (len(Na_prime.intersection(S)) - 1) / len(Na_prime)
-                            alpha_b_prime  = (len(Nb_prime.intersection(S)) + 1) / len(Nb_prime)
-                        elif (a in S) and (b not in S) and (a_prime not in S) and (b_prime  in S): # II
-                            alpha_a        = (len(Na.intersection(S)) +1) / len(Na)
-                            alpha_b        = (len(Nb.intersection(S)) -1) / len(Nb)
-                            alpha_a_prime  = (len(Na_prime.intersection(S)) - 1) / len(Na_prime)
-                            alpha_b_prime  = (len(Nb_prime.intersection(S)) + 1) / len(Nb_prime)
-                        elif (a not in S) and (b in S) and (a_prime in S) and (b_prime not in S): # III
-                            alpha_a        = (len(Na.intersection(S)) -1) / len(Na)
-                            alpha_b        = (len(Nb.intersection(S)) +1) / len(Nb)
-                            alpha_a_prime  = (len(Na_prime.intersection(S)) + 1) / len(Na_prime)
-                            alpha_b_prime  = (len(Nb_prime.intersection(S)) - 1) / len(Nb_prime)
-                        elif (a not in S) and (b  in S) and (a_prime not in S) and (b_prime  in S): # IV
-                            alpha_a        = (len(Na.intersection(S)) +1) / len(Na)
-                            alpha_b        = (len(Nb.intersection(S)) -1) / len(Nb)
-                            alpha_a_prime  = (len(Na_prime.intersection(S)) + 1) / len(Na_prime)
-                            alpha_b_prime  = (len(Nb_prime.intersection(S)) - 1) / len(Nb_prime)
+                        if (a in S) and (b not in S) and (a_prime in S) and (b_prime not in S):  # I
+                            alpha_a = (len(Na.intersection(S)) - 1) / len(Na)
+                            alpha_b = (len(Nb.intersection(S)) + 1) / len(Nb)
+                            alpha_a_prime = (
+                                len(Na_prime.intersection(S)) - 1) / len(Na_prime)
+                            alpha_b_prime = (
+                                len(Nb_prime.intersection(S)) + 1) / len(Nb_prime)
+                        elif (a in S) and (b not in S) and (a_prime not in S) and (b_prime in S):  # II
+                            alpha_a = (len(Na.intersection(S)) + 1) / len(Na)
+                            alpha_b = (len(Nb.intersection(S)) - 1) / len(Nb)
+                            alpha_a_prime = (
+                                len(Na_prime.intersection(S)) - 1) / len(Na_prime)
+                            alpha_b_prime = (
+                                len(Nb_prime.intersection(S)) + 1) / len(Nb_prime)
+                        elif (a not in S) and (b in S) and (a_prime in S) and (b_prime not in S):  # III
+                            alpha_a = (len(Na.intersection(S)) - 1) / len(Na)
+                            alpha_b = (len(Nb.intersection(S)) + 1) / len(Nb)
+                            alpha_a_prime = (
+                                len(Na_prime.intersection(S)) + 1) / len(Na_prime)
+                            alpha_b_prime = (
+                                len(Nb_prime.intersection(S)) - 1) / len(Nb_prime)
+                        elif (a not in S) and (b in S) and (a_prime not in S) and (b_prime in S):  # IV
+                            alpha_a = (len(Na.intersection(S)) + 1) / len(Na)
+                            alpha_b = (len(Nb.intersection(S)) - 1) / len(Nb)
+                            alpha_a_prime = (
+                                len(Na_prime.intersection(S)) + 1) / len(Na_prime)
+                            alpha_b_prime = (
+                                len(Nb_prime.intersection(S)) - 1) / len(Nb_prime)
                         # Hier kann man noch weiter zusammenfassen:
-                        elif ((a not in S) and (b  in S) and (a_prime not in S) and (b_prime  not in S)) or ((a  not in S) and (b  in S) and (a_prime  in S) and (b_prime  in S)): # V, XII
-                            alpha_a        = (len(Na.intersection(S))) / len(Na)
-                            alpha_b        = (len(Nb.intersection(S))) / len(Nb)
-                            alpha_a_prime  = (len(Na_prime.intersection(S)) + 1) / len(Na_prime)
-                            alpha_b_prime  = (len(Nb_prime.intersection(S)) - 1) / len(Nb_prime)
-                        elif ((a not in S) and (b not in S) and (a_prime  in S) and (b_prime  not in S)) or ((a  in S) and (b  in S) and (a_prime  in S) and (b_prime  not in S)): # VI, VIII
-                            alpha_a        = (len(Na.intersection(S)) -1) / len(Na)
-                            alpha_b        = (len(Nb.intersection(S)) +1) / len(Nb)
-                            alpha_a_prime  = (len(Na_prime.intersection(S))) / len(Na_prime)
-                            alpha_b_prime  = (len(Nb_prime.intersection(S)) ) / len(Nb_prime)
-                        elif ((a not in S) and (b  not in S) and (a_prime not in S) and (b_prime  in S)) or ((a  in S) and (b  in S) and (a_prime not in S) and (b_prime   in S)): # VII, IX
-                            alpha_a        = (len(Na.intersection(S)) +1) / len(Na)
-                            alpha_b        = (len(Nb.intersection(S)) -1) / len(Nb)
-                            alpha_a_prime  = (len(Na_prime.intersection(S))) / len(Na_prime)
-                            alpha_b_prime  = (len(Nb_prime.intersection(S)) ) / len(Nb_prime)
-                        elif ((a  in S) and (b not in S) and (a_prime in S) and (b_prime in S)) or ((a  in S) and (b not in S) and (a_prime not in S) and (b_prime not in S)): # X, XI
-                            alpha_a        = (len(Na.intersection(S))) / len(Na)
-                            alpha_b        = (len(Nb.intersection(S))) / len(Nb)
-                            alpha_a_prime  = (len(Na_prime.intersection(S))-1) / len(Na_prime)
-                            alpha_b_prime  = (len(Nb_prime.intersection(S)) +1) / len(Nb_prime)
+                        elif ((a not in S) and (b in S) and (a_prime not in S) and (b_prime not in S)) or ((a not in S) and (b in S) and (a_prime in S) and (b_prime in S)):  # V, XII
+                            alpha_a = (len(Na.intersection(S))) / len(Na)
+                            alpha_b = (len(Nb.intersection(S))) / len(Nb)
+                            alpha_a_prime = (
+                                len(Na_prime.intersection(S)) + 1) / len(Na_prime)
+                            alpha_b_prime = (
+                                len(Nb_prime.intersection(S)) - 1) / len(Nb_prime)
+                        elif ((a not in S) and (b not in S) and (a_prime in S) and (b_prime not in S)) or ((a in S) and (b in S) and (a_prime in S) and (b_prime not in S)):  # VI, VIII
+                            alpha_a = (len(Na.intersection(S)) - 1) / len(Na)
+                            alpha_b = (len(Nb.intersection(S)) + 1) / len(Nb)
+                            alpha_a_prime = (
+                                len(Na_prime.intersection(S))) / len(Na_prime)
+                            alpha_b_prime = (
+                                len(Nb_prime.intersection(S))) / len(Nb_prime)
+                        elif ((a not in S) and (b not in S) and (a_prime not in S) and (b_prime in S)) or ((a in S) and (b in S) and (a_prime not in S) and (b_prime in S)):  # VII, IX
+                            alpha_a = (len(Na.intersection(S)) + 1) / len(Na)
+                            alpha_b = (len(Nb.intersection(S)) - 1) / len(Nb)
+                            alpha_a_prime = (
+                                len(Na_prime.intersection(S))) / len(Na_prime)
+                            alpha_b_prime = (
+                                len(Nb_prime.intersection(S))) / len(Nb_prime)
+                        elif ((a in S) and (b not in S) and (a_prime in S) and (b_prime in S)) or ((a in S) and (b not in S) and (a_prime not in S) and (b_prime not in S)):  # X, XI
+                            alpha_a = (len(Na.intersection(S))) / len(Na)
+                            alpha_b = (len(Nb.intersection(S))) / len(Nb)
+                            alpha_a_prime = (
+                                len(Na_prime.intersection(S))-1) / len(Na_prime)
+                            alpha_b_prime = (
+                                len(Nb_prime.intersection(S)) + 1) / len(Nb_prime)
                         else:
-                            raise Exception("Problem with function alternative exp. cut strain")     
+                            raise Exception(
+                                "Problem with function alternative exp. cut strain")
                         # add new values
-                        strain_b_prime += (alpha_a * (1 - alpha_a) + alpha_b * (1 - alpha_b) + alpha_a_prime * (1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))  # print("Cut strain: ", strain,"Neu berechneter Cut strain: ", cut_strain_scenario)
-                        sum_a_prime += strain_b_prime 
+                        # print("Cut strain: ", strain,"Neu berechneter Cut strain: ", cut_strain_scenario)
+                        strain_b_prime += (alpha_a * (1 - alpha_a) + alpha_b * (1 - alpha_b) + alpha_a_prime * (
+                            1 - alpha_a_prime) + alpha_b_prime * (1 - alpha_b_prime))
+                        sum_a_prime += strain_b_prime
                     else:
                         sum_a_prime += strain_b_prime
                 averaged_strain_a_prime = sum_a_prime / len(Nb - {a} - Na)
                 strains_a_prime += averaged_strain_a_prime
             else:
-                strains_a_prime += strain  
-    return strains_a_prime /(m*d)   
-        # For symmetry:
+                strains_a_prime += strain
+    return strains_a_prime / (m*d)
+    # For symmetry:
+
 
 def expected_cut_strain_exact(G, S, d, strain):
     V = set(G.nodes)
@@ -220,9 +243,9 @@ def expected_cut_strain_exact(G, S, d, strain):
 
 def spectral_gap_normalized_sparse(G, d=None, tol=1e-3, maxiter=1000, v0=None):
     """
-    Normalisierte Spektrallücke gamma, gleich 1,0 minus lambda zwei von A geteilt durch d.
-    A ist die CSR Adjazenzmatrix, d ist der Grad, bei None wird d aus dem Modus der Grade geschätzt.
-    Gibt float zurück, bei Problemen np.nan.
+     Normalized spectral gap gamma, equal to 1.0 minus lambda two of A divided by d.    
+     A is the CSR adjacency matrix, d is the degree, if None, d is estimated from the degree mode.Returns float, 
+     np.nan if there are problems.
     """
     d = float(d)
     if not np.isfinite(d) or d <= 0:
@@ -249,6 +272,7 @@ def _one_trial(n, d, seed):
     return spectral_gap_normalized_sparse(G, d)
 
 
+# Calculates threshold by genereating 10 random graphs and calculating there normalized spectral gap. Optimized by threading. Quantile can be choosen.
 def recommend_threshold_by_sampling(n, d, trials=10, quantile=0.60, seed=42, n_jobs=-1):
     if n < 3:
         raise ValueError(
