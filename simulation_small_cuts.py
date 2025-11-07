@@ -1,15 +1,15 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button, TextBox, RadioButtons
+from matplotlib.widgets import Button, TextBox
 from collections import OrderedDict
 import numpy as np
 from matplotlib.lines import Line2D
 import Graph
 import Calc_updated
 
-# ==========
-# User input
-# ==========
+# =========================
+# Same functionalities as in simultion_all_cuts.py -> for comments and explanations on the code, look at simultion_all_cuts.py 
+# =========================
 print("Choose number of nodes:")
 n = int(input())
 
@@ -26,19 +26,14 @@ number_of_cliques = n // (d + 1)
 size_of_cliques = d + 1
 print(f"You chose a graph with {number_of_cliques} cliques, each with a size of {size_of_cliques} nodes.")
 
-G0, pos = Graph.create_ring_of_cliques(number_of_cliques, size_of_cliques)
 
-print(f"How many adjacent cliques should be in the block-cut? Choose k from 1 to {number_of_cliques}:")
-k_block = int(input())
-if not (1 <= k_block <= number_of_cliques):
-    raise ValueError(f"k must be in [1, {number_of_cliques}]")
+G0, pos = Graph.create_ring_of_cliques(number_of_cliques, size_of_cliques)
 
 print("How many flip operations do you want to run?")
 upper_bound = int(input())
 if upper_bound < 0:
     raise ValueError("upper_bound must be >= 0")
 
-# Userentscheidung: Graph visualisieren? ---
 default_visualize = (n <= 100)
 default_str = "y" if default_visualize else "n"
 print(f"Visualize the graph during navigation? (y/n) [default {default_str}]")
@@ -46,9 +41,7 @@ resp = input().strip().lower()
 visualize_graph = (default_visualize if resp == "" else resp in ("y", "yes", "j", "ja"))
 draw_labels = visualize_graph and (n <= 100)
 
-
 def _get_int_or_default(prompt: str, default_val: int) -> int:
-    '''Interval/Input Helper'''
     print(prompt)
     try:
         v = int(input())
@@ -68,13 +61,11 @@ def _get_float_or_default(prompt: str, default_val: float) -> float:
         print(f"Invalid input, using default = {default_val}.")
         return default_val
 
-# Actual Cut Strain, mandatory (Interval chosen by user)
 actual_period = _get_int_or_default(
     "Every how many steps should the ACTUAL Cut Strain be recomputed? (e.g., 1 = every step)",
     1
 )
 
-# Expected Strain Giakkoupis, optional (Interval chosen by user)
 print("Compute EXPECTED Cut Strain (Giakkoupis)? (y/n) [default y]")
 resp_exact = input().strip().lower()
 compute_exact = not (resp_exact in ("n", "no", "nein"))
@@ -84,9 +75,8 @@ if compute_exact:
         1
     )
 else:
-    exact_period = None 
+    exact_period = None  
 
-# Expected Strain Alternative, otional (Interval chosen by user)
 print("Compute alternative Expected Cut Strain? (y/n) [default n]")
 resp_alt = input().strip().lower()
 compute_alt = (resp_alt in ("y", "yes", "j", "ja"))
@@ -97,65 +87,59 @@ if compute_alt:
         50
     )
 
-# δ for die Expected Cut Size
 delta_cut_size = 1.0 / d
 
-# Three Cuts: Biggest, smallest, every 2nd clique
+k_1 = 1
+k_quarter = max(1, number_of_cliques // 4)
+k_half = max(1, number_of_cliques // 2)
+
 CUTS = OrderedDict([
-    ("biggest",        Graph.generate_cut_3(G0, number_of_cliques, size_of_cliques)),
-    (f"block_{k_block}", Graph.generate_cut_2(G0, k_block, size_of_cliques)),
-    ("every_second",   Graph.generate_cut_1(G0)),
+    (f"block_{k_1}",       Graph.generate_cut_2(G0, k_1,       size_of_cliques)),
+    (f"block_{k_quarter}", Graph.generate_cut_2(G0, k_quarter, size_of_cliques)),
+    (f"block_{k_half}",    Graph.generate_cut_2(G0, k_half,    size_of_cliques)),
 ])
 
 CUT_TITLES = {
-    "biggest": f"Big Cut | n: {n}",
-    f"block_{k_block}": f"Smallest Cut (Block-Cut, k = {k_block}) |  n: {n}",
-    "every_second": f"Every second Clique | n: {n}",
+    f"block_{k_1}":       f"Block-Cut k = {k_1} (smallest block) | n: {n}",
+    f"block_{k_quarter}": f"Block-Cut k = {k_quarter} (~1/4 of cliques) | n: {n}",
+    f"block_{k_half}":    f"Block-Cut k = {k_half} (1/2 of cliques) | n: {n}",
 }
 
-# Smallest-Cut
-if "block_1" in CUTS:
-    LB_TRACK_KEY = "block_1"
+if f"block_{k_1}" in CUTS:
+    LB_TRACK_KEY = f"block_{k_1}"
 else:
     init_sizes = {name: len(Calc_updated.cut_metrics(G0, S, d)[2]) for name, S in CUTS.items()}
     LB_TRACK_KEY = min(init_sizes, key=init_sizes.get)
 
-# Initial Cut Size c0 and eligibility-check (lower bound is checked only if c0 <= d)
 c0_init = len(Calc_updated.cut_metrics(G0, CUTS[LB_TRACK_KEY], d)[2])
 LB_ELIGIBLE = (c0_init <= d)
 
-# ==========
-# Running simulations.
-# ==========
-
-graphs = [G0.copy()] if visualize_graph else []  # Snapshot nur für Visualisierung
-flip_info = [(set(), set())]                     # Index 0 = Startzustand
-changed_flags = [False]                          # Schritt 0: nichts geändert
-hub_edges = [None]                               # Schritt 0: keine Hub-Kante
+graphs = [G0.copy()] if visualize_graph else []  
+flip_info = [(set(), set())]                     
+changed_flags = [False]                          
+hub_edges = [None]                               
 current_G = G0
 
-# Container for metrics
 metrics = {
     name: {"strain": [], "exp_exact": [], "exp_alt": [], "exp_alt_last_step": [],
            "cut_size": [], "exp_cut_size_lb": [], "under_lb_flag": []}
     for name in CUTS
 }
-# for lower bound (cut size)
+
 metrics[LB_TRACK_KEY]["lb_violations_steps"] = []
 metrics[LB_TRACK_KEY]["lb_last_threshold"] = []
 
-# step 0 (before first flipoperation)
 for name, S in CUTS.items():
     s0, _, cut_edges0 = Calc_updated.cut_metrics(current_G, S, d)
     c0 = len(cut_edges0)
     metrics[name]["strain"].append(s0)
-    metrics[name]["exp_exact"].append(np.nan)      
-    metrics[name]["exp_alt"].append(np.nan)    
+    metrics[name]["exp_exact"].append(np.nan)
+    metrics[name]["exp_alt"].append(np.nan)
     metrics[name]["exp_alt_last_step"].append(None)
     metrics[name]["cut_size"].append(c0)
 
     if name == LB_TRACK_KEY:
-        metrics[name]["exp_cut_size_lb"].append(np.nan)    
+        metrics[name]["exp_cut_size_lb"].append(np.nan)
         metrics[name]["lb_last_threshold"].append(np.nan)
     else:
         metrics[name]["exp_cut_size_lb"].append(np.nan)
@@ -164,42 +148,34 @@ for name, S in CUTS.items():
 
 amount_flip_operations = 0
 
-# main loop
 for t in range(1, upper_bound + 1):
     amount_flip_operations += 1
 
-    # Before flip: only for lower bound
     s_prev_LB, _, cut_edges_prev_LB = Calc_updated.cut_metrics(current_G, CUTS[LB_TRACK_KEY], d)
     c_prev_LB = len(cut_edges_prev_LB)
     pre_cut_edges_LB = set(cut_edges_prev_LB)
 
-    # Per-Step-threshold for lower bound-Cut
     lb_threshold_t = c_prev_LB + 2.0 * (1.0 - delta_cut_size * c_prev_LB)
     metrics[LB_TRACK_KEY]["exp_cut_size_lb"].append(lb_threshold_t)
     metrics[LB_TRACK_KEY]["lb_last_threshold"].append(lb_threshold_t)
 
-    # For calculating Exp. Cut Strain Giakkoupis (t), we need Actual Cut Strain (t-1)
     prev_strain_for_exact = {}
     if compute_exact and (t % exact_period == 0):
         for name, S in CUTS.items():
             prev_strain_for_exact[name] = Calc_updated.cut_metrics(current_G, S, d)[0]
 
-    # For calculating Exp. Cut Strain Alternative (t), we need Actual Cut Strain (t-1)
     prev_strain_for_alt = {}
     if compute_alt and (t % alt_period == 0):
         for name, S in CUTS.items():
             prev_strain_for_alt[name] = Calc_updated.cut_metrics(current_G, S, d)[0]
 
-    # Execute flipoperation
     current_G, removed, added, hub = Graph.flip_operation(current_G, number_of_cliques, size_of_cliques)
     changed = (removed is not None and added is not None)
     hub_edges.append(hub)
 
-    # Visualisation: save snapshot
     if visualize_graph:
         graphs.append(current_G.copy())
 
-    # Information on flipoperation
     if changed:
         removed_norm = {tuple(sorted(e)) for e in removed}
         added_norm   = {tuple(sorted(e)) for e in added}
@@ -209,10 +185,8 @@ for t in range(1, upper_bound + 1):
         flip_info.append((set(), set()))
         changed_flags.append(False)
 
-    # After Flip: Save metrics, check for lower bound
     for name, S in CUTS.items():
         if not changed:
-            # no changes
             metrics[name]["strain"].append(metrics[name]["strain"][t-1])
             metrics[name]["exp_exact"].append(metrics[name]["exp_exact"][t-1])
             metrics[name]["exp_alt"].append(metrics[name]["exp_alt"][t-1])
@@ -227,11 +201,9 @@ for t in range(1, upper_bound + 1):
         need_exact_t  = (compute_exact and (t % exact_period == 0))
         need_alt_t    = (compute_alt and (t % alt_period == 0))
 
-        # Actual Strain (t) & Cut Size (t)
         strain_t, _, cut_edges_t = Calc_updated.cut_metrics(current_G, S, d)
         cut_size_t = len(cut_edges_t)
 
-        # Actual strain (t)
         if need_actual_t or need_exact_t:
             metrics[name]["strain"].append(strain_t)
             metrics[name]["cut_size"].append(cut_size_t)
@@ -239,7 +211,6 @@ for t in range(1, upper_bound + 1):
             metrics[name]["strain"].append(metrics[name]["strain"][t-1])
             metrics[name]["cut_size"].append(cut_size_t)
 
-        # Expected Strain Giakkpoupis (t) (uses Actual strain (t-1))
         if need_exact_t:
             exp_exact_t = Calc_updated.expected_cut_strain_exact(
                 current_G, S, d, prev_strain_for_exact[name]
@@ -248,7 +219,6 @@ for t in range(1, upper_bound + 1):
         else:
             metrics[name]["exp_exact"].append(metrics[name]["exp_exact"][t-1])
 
-        
         if need_alt_t:
             exp_alt_t = Calc_updated.calculate_expected_cut_strain_alternative(
                 current_G, S, d, prev_strain_for_alt[name]
@@ -259,16 +229,13 @@ for t in range(1, upper_bound + 1):
             metrics[name]["exp_alt"].append(metrics[name]["exp_alt"][t-1])
             metrics[name]["exp_alt_last_step"].append(metrics[name]["exp_alt_last_step"][t-1])
 
-        # exp_cut_size_lb carried forward for lower bound-Cuts
         if name != LB_TRACK_KEY:
             metrics[name]["exp_cut_size_lb"].append(np.nan)
 
-        # lower bound-check only for lower bound-cuts
         if name == LB_TRACK_KEY:
             under_lb = False
             if LB_ELIGIBLE and (hub is not None):
                 a, b = hub if isinstance(hub, tuple) else tuple(hub)
-                # Hub-Edge in S?
                 hub_in_cut = ((a, b) in pre_cut_edges_LB) or ((b, a) in pre_cut_edges_LB)
                 if hub_in_cut:
                     threshold = metrics[LB_TRACK_KEY]["lb_last_threshold"][-1]
@@ -279,23 +246,20 @@ for t in range(1, upper_bound + 1):
         else:
             metrics[name]["under_lb_flag"].append(False)
 
-    # Show progress in terminal every ~1% 
     report_every = max(1, upper_bound // 100)
-    if amount_flip_operations % report_every == 0:
-        percentage = (amount_flip_operations * 100.0) / upper_bound
-        print(f"{percentage:.0f} %  |  attempts: {amount_flip_operations}")
+    if (t % report_every) == 0:
+        percentage = (t * 100.0) / upper_bound
+        print(f"{percentage:.0f} %  |  attempts: {t}")
 
-# steps for plots 
-steps = list(range(len(next(iter(metrics.values()))["strain"])))  # 0..T
+steps = list(range(len(next(iter(metrics.values()))["strain"])))
 total_steps = len(steps) - 1
 
-# ==========
-# Plot-Layout 
-# ==========
+# ========
+# Plot-Layout
+# ========
 fig = plt.figure(figsize=(14, 9))
 
 if visualize_graph:
-    # two columns:  Strain-Charts on left side; Cut-Size-Charts OR Graphs on right side
     gs = fig.add_gridspec(
         nrows=4, ncols=2,
         width_ratios=[1.0, 1.0],
@@ -303,19 +267,15 @@ if visualize_graph:
         left=0.05, right=0.98, bottom=0.10, top=0.98,
         wspace=0.25, hspace=0.25
     )
-    # left: 3 Strain-Charts
     ax_cut1  = fig.add_subplot(gs[1, 0])
     ax_cut2  = fig.add_subplot(gs[2, 0], sharex=ax_cut1)
     ax_cut3  = fig.add_subplot(gs[3, 0], sharex=ax_cut1)
 
-    # Info-Panel on top
     ax_info_left  = fig.add_subplot(gs[0, 0])
     ax_info_right = fig.add_subplot(gs[0, 1])
 
-    # right: Graphs OR Cut-Size-Charts
     ax_graph = fig.add_subplot(gs[1:, 1])
 
-    # Cut-Size
     gs_sizes = gs[1:, 1].subgridspec(3, 1, hspace=0.25)
     ax_size1 = fig.add_subplot(gs_sizes[0, 0], sharex=ax_cut1)
     ax_size2 = fig.add_subplot(gs_sizes[1, 0], sharex=ax_cut1)
@@ -324,7 +284,6 @@ if visualize_graph:
         ax.set_visible(False)
 
 else:
-    # No visualisation of Graph
     gs = fig.add_gridspec(
         nrows=4, ncols=2,
         width_ratios=[1.0, 1.0],
@@ -333,29 +292,25 @@ else:
         wspace=0.25, hspace=0.25
     )
 
-    # Info-Panel on top 
     ax_info_left  = fig.add_subplot(gs[0, 0])
     ax_info_right = fig.add_subplot(gs[0, 1])
 
-    # left: 3 Strain-Charts
     ax_cut1  = fig.add_subplot(gs[1, 0])
     ax_cut2  = fig.add_subplot(gs[2, 0], sharex=ax_cut1)
     ax_cut3  = fig.add_subplot(gs[3, 0], sharex=ax_cut1)
 
-    # right: Cut-Size-Charts
     ax_size1 = fig.add_subplot(gs[1, 1], sharex=ax_cut1)
     ax_size2 = fig.add_subplot(gs[2, 1], sharex=ax_cut1)
     ax_size3 = fig.add_subplot(gs[3, 1], sharex=ax_cut1)
 
-    ax_graph = None  
-
+    ax_graph = None
 
 ax_info_left.set_axis_off()
 ax_info_right.set_axis_off()
 
-# ==========
-# plots and legends
-# ==========
+# =======
+# Plot-Functions
+# =======
 def plot_cut_metrics(ax, name, show_xlabel=False):
     y_strain = metrics[name]["strain"]
     y_exact  = metrics[name]["exp_exact"]
@@ -370,7 +325,7 @@ def plot_cut_metrics(ax, name, show_xlabel=False):
             y_exact_plot[0] = np.nan
         l2, = ax.plot(steps, y_exact_plot, label="Expected Cut Strain (Giakkoupis)")
         lines.append(l2)
-    # Ø-line in charts (red, dotted)
+
     try:
         avg_strain = float(np.nanmean(y_strain))
         ax.axhline(avg_strain, color="#9e0606", linestyle="--", linewidth=1.0, zorder=0, label="_nolegend_")
@@ -391,9 +346,8 @@ def plot_cut_metrics(ax, name, show_xlabel=False):
 
 def plot_cut_sizes(ax, name, show_xlabel=False):
     y_size = metrics[name]["cut_size"]
-    ax.plot(steps, y_size, color="green", label="Cut Size")
+    ax.plot(steps, y_size, label="Cut Size", color="green")
 
-    # Ø-line in charts (red, dotted)
     try:
         avg_size = float(np.nanmean(y_size))
         ax.axhline(avg_size, color="#9e0606", linestyle="--", linewidth=1.0, zorder=0, label="_nolegend_")
@@ -410,24 +364,23 @@ def plot_cut_sizes(ax, name, show_xlabel=False):
         ax.set_xlabel("Flip-Index")
     ax.set_ylabel("Cut Size")
 
+name_cut1 = f"block_{k_1}"
+name_cut2 = f"block_{k_quarter}"
+name_cut3 = f"block_{k_half}"
 
-# Cut Strain Plots on left side
-lines_top = plot_cut_metrics(ax_cut1, "biggest")
-_ = plot_cut_metrics(ax_cut2, f"block_{k_block}")
-_ = plot_cut_metrics(ax_cut3, "every_second", show_xlabel=True)
+lines_top = plot_cut_metrics(ax_cut1, name_cut1)
+_ = plot_cut_metrics(ax_cut2, name_cut2)
+_ = plot_cut_metrics(ax_cut3, name_cut3, show_xlabel=True)
 ax_cut2.set_ylabel("Cut Strain", labelpad=6)
 
-# Cut Size Plots on right side (visible only without graph)
-plot_cut_sizes(ax_size1, "biggest")
-plot_cut_sizes(ax_size2, f"block_{k_block}")
-plot_cut_sizes(ax_size3, "every_second", show_xlabel=True)
+plot_cut_sizes(ax_size1, name_cut1)
+plot_cut_sizes(ax_size2, name_cut2)
+plot_cut_sizes(ax_size3, name_cut3, show_xlabel=True)
 if visualize_graph:
     for ax in (ax_size1, ax_size2, ax_size3):
         ax.set_visible(False)
 
-# Legend
-legend_handles = list(lines_top)  # enthält: Actual Cut Strain (+ ggf. Expected Giakkoupis)
-# Proxy-Handle for Cut Size (green)
+legend_handles = list(lines_top)
 legend_handles.append(Line2D([0], [0], color='green', label='Cut Size'))
 
 fig.legend(
@@ -437,27 +390,23 @@ fig.legend(
     ncol=1, frameon=False, prop={'size': 9}, borderaxespad=0.0
 )
 
-# Cursor-Lines (Strain)
 cursor1 = ax_cut1.axvline(x=0, linestyle="--", color="black", linewidth=1)
 cursor2 = ax_cut2.axvline(x=0, linestyle="--", color="black", linewidth=1)
 cursor3 = ax_cut3.axvline(x=0, linestyle="--", color="black", linewidth=1)
 
-# Cursor-Lines (Size)
 cursor_s1 = ax_size1.axvline(x=0, linestyle="--", color="black", linewidth=1)
 cursor_s2 = ax_size2.axvline(x=0, linestyle="--", color="black", linewidth=1)
 cursor_s3 = ax_size3.axvline(x=0, linestyle="--", color="black", linewidth=1)
 
-# ==========
-# Info-Panel + Controls (right)
-# ==========
-# BBox for Dropdown/View-Controls
+# =======
+# Info-Panel + Controls
+# =======
 info_bbox = ax_info_right.get_position()
 
-# Cut-Selection-Widget (right hand side)
 label_by_key = {k: CUT_TITLES.get(k, k) for k in CUTS.keys()}
 key_by_label = {v: k for k, v in label_by_key.items()}
 labels = [label_by_key[k] for k in CUTS.keys()]
-selected_cut_key = [list(CUTS.keys())[0]]  # initial: "biggest"
+selected_cut_key = [list(CUTS.keys())[0]]  
 
 drop_w = 0.16 * info_bbox.width
 drop_h = 0.50 * info_bbox.height
@@ -511,7 +460,6 @@ def _bind_dropdown(ax, labels, initial_label):
 
 _ui_type = _bind_dropdown(drop_ax, labels, label_by_key[selected_cut_key[0]])
 
-# View-Selector
 if visualize_graph:
     view_w = drop_w
     view_h = 0.30 * info_bbox.height
@@ -557,20 +505,19 @@ if visualize_graph:
                     circ.set_radius(0.045)
             except Exception:
                 pass
-            for spine in ax.spines.values():
+            for spine in view_selector.ax.spines.values():
                 spine.set_visible(False)
             ax.tick_params(left=False, labelleft=False, bottom=False, labelbottom=False)
             return ("radio", view_selector)
 
     _view_ui_type, _view_ui = _bind_view_selector(view_ax, initial_value="Graph")
 
-# Jump to arbitrary step.
 axbox = plt.axes([0.08, 0.02, 0.18, 0.05])
 step_box = TextBox(axbox, 'Go to step: ', initial='0')
 
-# ==========
-# Functions for drawing & Stats-Helper
-# ==========
+# ======
+# Functions drawing and infos
+# ======
 def draw_graph_at_step(i: int):
     if not visualize_graph or ax_graph is None or not ax_graph.get_visible():
         return
@@ -578,7 +525,6 @@ def draw_graph_at_step(i: int):
     G = graphs[i]
     removed_edges, added_edges = flip_info[i] if i < len(flip_info) else (set(), set())
 
-    # Colour of nodes: mark chosen Cut as yellow
     S = CUTS[selected_cut_key[0]]
     node_cols = ["yellow" if (u in S) else "lightblue" for u in G.nodes()]
 
@@ -586,13 +532,11 @@ def draw_graph_at_step(i: int):
                            node_size=80 if len(G) > 150 else 120)
     nx.draw_networkx_edges(G, pos, ax=ax_graph, edge_color="black", width=1.2)
 
-    # Added edges in this step: red
     added_list = [(u, v) for (u, v) in added_edges if G.has_edge(u, v)]
     if added_list:
         nx.draw_networkx_edges(G, pos, edgelist=added_list, ax=ax_graph,
                                edge_color="red", width=2.0)
 
-    # Removed edges in this step: blue, dotted
     for (u, v) in removed_edges:
         if u in pos and v in pos:
             x = [pos[u][0], pos[v][0]]
@@ -603,7 +547,7 @@ def draw_graph_at_step(i: int):
         labels_nodes = {node: str(node) for node in G.nodes()}
         nx.draw_networkx_labels(G, pos, labels=labels_nodes, ax=ax_graph, font_size=6)
 
-    ax_graph.set_title(f"Ring of Cliques – Schritt {i}/{total_steps}")
+    ax_graph.set_title(f"Ring of Cliques – Step {i}/{total_steps}")
     ax_graph.set_axis_off()
 
 def format_edges(edges_set):
@@ -618,11 +562,11 @@ def format_edges(edges_set):
 def _compute_diff_stats(actual_arr, expected_arr, step_mask):
     diffs = []
     over = under = equal = 0
-    for i, use in enumerate(step_mask):
+    for idx, use in enumerate(step_mask):
         if not use:
             continue
-        a = actual_arr[i]
-        e = expected_arr[i]
+        a = actual_arr[idx]
+        e = expected_arr[idx]
         if not (np.isfinite(a) and np.isfinite(e)):
             continue
         d = e - a
@@ -638,41 +582,37 @@ def _compute_diff_stats(actual_arr, expected_arr, step_mask):
     return avg_abs, over, under, equal, n_used
 
 def update_info_panel(i: int):
-    # Empty info panel
     ax_info_left.clear();  ax_info_left.set_axis_off()
     ax_info_right.clear(); ax_info_right.set_axis_off()
 
     removed_edges, added_edges = flip_info[i] if i < len(flip_info) else (set(), set())
-    k = selected_cut_key[0]
-    title = CUT_TITLES.get(k, k)
+    kkey = selected_cut_key[0]
+    title = CUT_TITLES.get(kkey, kkey)
 
-    val_strain = metrics[k]["strain"][i]
-    val_csize  = metrics[k]["cut_size"][i]
+    val_strain = metrics[kkey]["strain"][i]
+    val_csize  = metrics[kkey]["cut_size"][i]
 
-    # Expected Cut Strain Giakkoupis
     if not compute_exact:
-        val_exact_str = "N/A"; exact_suffix = "(deaktiviert)"
+        val_exact_str = "N/A"; exact_suffix = "(disabled)"
     else:
-        if i == 0 or not np.isfinite(metrics[k]["exp_exact"][i]):
+        if i == 0 or not np.isfinite(metrics[kkey]["exp_exact"][i]):
             val_exact_str = "N/A"; exact_suffix = f"(Interval: {exact_period})"
         else:
-            val_exact_str = f"{metrics[k]['exp_exact'][i]:.4f}"; exact_suffix = f"(Interval: {exact_period})"
+            val_exact_str = f"{metrics[kkey]['exp_exact'][i]:.4f}"; exact_suffix = f"(Interval: {exact_period})"
 
-    # Expected Cut Strain Alternative
-    last_alt_step = metrics[k]["exp_alt_last_step"][i]
+    last_alt_step = metrics[kkey]["exp_alt_last_step"][i]
     if not compute_alt:
-        val_alt_str = "N/A"; alt_suffix = "(deaktiviert)"
+        val_alt_str = "N/A"; alt_suffix = "(disabled)"
     else:
-        val_alt_str = "N/A" if not np.isfinite(metrics[k]["exp_alt"][i]) else f"{metrics[k]['exp_alt'][i]:.4f}"
-        alt_suffix = "(noch nicht berechnet)" if last_alt_step is None else f"(zuletzt bei Schritt {last_alt_step}; Period: {alt_period})"
+        val_alt_str = "N/A" if not np.isfinite(metrics[kkey]["exp_alt"][i]) else f"{metrics[kkey]['exp_alt'][i]:.4f}"
+        alt_suffix = "(not yet)" if last_alt_step is None else f"(last at step {last_alt_step}; Period: {alt_period})"
 
-    # Ø over all steps.
     try:
-        avg_strain_sel = float(np.nanmean(metrics[k]["strain"]))
+        avg_strain_sel = float(np.nanmean(metrics[kkey]["strain"]))
     except Exception:
         avg_strain_sel = float("nan")
     try:
-        avg_csize_sel = float(np.nanmean(metrics[k]["cut_size"]))
+        avg_csize_sel = float(np.nanmean(metrics[kkey]["cut_size"]))
     except Exception:
         avg_csize_sel = float("nan")
 
@@ -685,13 +625,12 @@ def update_info_panel(i: int):
     )
 
     lines = [
-        f"Schritt {i}/{total_steps}   |   Ausgewählter Cut: {title}",
+        f"Step {i}/{total_steps}   |   Selected Cut: {title}",
         line_actual,
         f"Expected Cut Strain (Giakkoupis): {val_exact_str} {exact_suffix}",
         f"Expected Cut Strain (alternative): {val_alt_str} {alt_suffix}",
     ]
 
-    # information on lower bound (show only if smallest cut is chosen)
     if selected_cut_key[0] == LB_TRACK_KEY:
         try:
             lb_step_val = metrics[LB_TRACK_KEY]["exp_cut_size_lb"][i]
@@ -702,37 +641,34 @@ def update_info_panel(i: int):
         viol_list_str = ", ".join(map(str, viol_steps)) if viol_steps else "-"
 
         lines.append(f"LB violations (smallest cut): {viol_count}  |  Steps: {viol_list_str}")
-
         lines += [
             f"LB active?  {'YES' if LB_ELIGIBLE else 'no'}  (initial cut size = {c0_init}, d = {d})",
             f"LB threshold (this step, if hub-edge crosses): {('N/A' if not np.isfinite(lb_step_val) else f'{lb_step_val:.2f}')}  |  δ={delta_cut_size}",
         ]
 
-    # Deviation-statistics
     def _fmt_avg(x): return "N/A" if not np.isfinite(x) else f"{x:.6f}"
 
     if compute_exact:
         mask_exact = [(t > 0) and changed_flags[t] and (t % exact_period == 0) for t in range(len(steps))]
-        avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[k]["strain"], metrics[k]["exp_exact"], mask_exact)
+        avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[kkey]["strain"], metrics[kkey]["exp_exact"], mask_exact)
         lines.append(
-            f"Actual Strain - Exp. Strain Giakkoupis: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
+            f"Actual Strain - Exp. Strain Giakkoupis: Ø-abs.dev={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
         )
 
     if compute_alt:
         mask_alt = [(t > 0) and changed_flags[t] and (t % alt_period == 0) for t in range(len(steps))]
-        avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[k]["strain"], metrics[k]["exp_alt"], mask_alt)
+        avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[kkey]["strain"], metrics[kkey]["exp_alt"], mask_alt)
         lines.append(
-            f"Actual Strain - Exp. Strain Alt.: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
+            f"Actual Strain - Exp. Strain Alt.: Ø-abs.dev={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
         )
 
     if compute_exact and compute_alt:
         mask_both = [(t > 0) and changed_flags[t] and (t % exact_period == 0) and (t % alt_period == 0) for t in range(len(steps))]
-        avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[k]["exp_exact"], metrics[k]["exp_alt"], mask_both)
+        avg_abs, over, under, equal, n_used = _compute_diff_stats(metrics[kkey]["exp_exact"], metrics[kkey]["exp_alt"], mask_both)
         lines.append(
-            f"Exp. Strain Giakkoupis- Exp. Strain Alt.: Ø-Abw={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
+            f"Exp. Strain Giakkoupis - Exp. Strain Alt.: Ø-abs.dev={_fmt_avg(avg_abs)}  |  N={n_used}  |  >={over}  |  <={under}  |  =={equal}"
         )
 
-    # Flip-Edges 
     lines += [
         f"Removed: {format_edges(removed_edges)}",
         f"Added:   {format_edges(added_edges)}",
@@ -746,11 +682,11 @@ def update_info_panel(i: int):
     if right_lines:
         ax_info_right.text(0.02, 0.95, "\n".join(right_lines), va="top", ha="left", fontsize=10)
 
-# ==========
-# Navigation and View
-# ==========
+# ======
+# Navigation + View
+# ======
 current_step = [0]
-view_mode = ["Graph" if visualize_graph else "Cut Size"]  
+view_mode = ["Graph" if visualize_graph else "Cut Size"]
 
 def set_view(mode: str):
     view_mode[0] = mode
@@ -766,13 +702,10 @@ def set_view(mode: str):
     fig.canvas.draw_idle()
 
 def update_all(i: int):
-    # update cursor  (Strain)
     for ln in (cursor1, cursor2, cursor3):
         ln.set_xdata([i, i])
-    # update cursor (Size)
     for ln in (cursor_s1, cursor_s2, cursor_s3):
         ln.set_xdata([i, i])
-    # Info-Panel +  draw Graph/Cut-Size (optional)
     update_info_panel(i)
     if ax_graph is not None and view_mode[0] == "Graph":
         draw_graph_at_step(i)
@@ -795,7 +728,6 @@ def on_submit_step(text):
     current_step[0] = x
     update_all(x)
 
-# Buttons below
 axprev = plt.axes([0.30, 0.02, 0.16, 0.05])
 axnext = plt.axes([0.54, 0.02, 0.16, 0.05])
 bprev = Button(axprev, '⟵ Previous')
@@ -803,9 +735,7 @@ bnext = Button(axnext, 'Next ⟶')
 bprev.on_clicked(on_prev)
 bnext.on_clicked(on_next)
 
-# TextBox-Callback
 step_box.on_submit(on_submit_step)
 
-# Initial drawing
 update_all(current_step[0])
 plt.show()

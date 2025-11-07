@@ -1,36 +1,16 @@
-import networkx as nx  # oder: import networkx as xn
+import networkx as nx 
 import numpy as np
 import matplotlib.pyplot as plt
 import random
 import itertools
 import copy
 
-
-def create_random_d_regular_graph(seed=None):
-    n = random.randint(10, 30)
-    rng = random.Random(seed)
-    possible_d = [d for d in range(3, n // 2 + 1) if (n * d) % 2 == 0]
-    d = rng.choice(possible_d)
-    # d = random.randint(2, n/2)
-    G = nx.random_regular_graph(d, n, seed=seed)
-    pos = nx.spring_layout(G, seed=42)  # feste Knotenpositionen
-    return G, pos
-
-
-def create_random_even_cycle_graph(seed=None):
-    # d = 2
-    min_n, max_n = 8, 30
-    rng = random.Random(seed)
-    # Da d = 2 und d * n gerade sein muss, wähle n gerade:
-    possible_n = [num for num in range(min_n, max_n + 1) if num % 2 == 0]
-    n = rng.choice(possible_n)
-    G = nx.cycle_graph(n)
-    pos = nx.circular_layout(G)  # Fixiertes Kreis-Layout
-    return G, pos, n
-
+# ======
+# Create different types of cuts.
+# ======
 
 def generate_cut_1(G):
-    # Jede zweite Clique: wähle alle Knoten, deren Clique-ID (vor dem Unterstrich) gerade ist
+    ''' Generates cut including every 2nd clique: Choose all nodes whose Clique-ID (before '_') is pair '''
     S = set()
     for node in G.nodes():
         clique_id = int(str(node).split('_')[0])  
@@ -38,49 +18,49 @@ def generate_cut_1(G):
             S.add(node)
     return S
 
-
-'''
-def generate_cut_1(G):
-    S_ = [] # hässlicher Code, zu optimieren
-    nodes = list(G.nodes)
-    for i in range(len(nodes)):
-        if int(nodes[i][0]) % 2 == 0:
-            S_.append(nodes[i])
-    S =  {S_[i] for i in range(len(S_))}
-    return S
-'''
-
-
 def generate_cut_2(G, amount_cliques: int, p_clique_size: int):
+    ''' Generates smallest Cut, including only entire cliques '''
     S = set()
-    # S_ = [] # hässlicher Code, zu optimieren
     nodes = list(G.nodes)
     for i in range(amount_cliques*p_clique_size):
         S.add(nodes[i])
-        # S_.append(nodes[i])
-    # S =  {S_[i] for i in range(len(S_))}
     return S
 
-# Maximum Cut Size:
-
-
 def generate_cut_3(G, amount_cliques: int, p_clique_size: int):
-    # S_ = [] # hässlicher Code, zu optimieren
+    ''' Generates big Cut, including half of each clique's nodes '''
     S = set()
     nodes = list(G.nodes)
     nodes_clique_S = p_clique_size // 2
-    # Für jede Clique:
+    # for each clique
     for i in range(amount_cliques):
-        # Füge die Hälfte der Knoten zu S hinzu:
+        # add half of its nodes
         for j in range(nodes_clique_S):
-            # print(f"{i}","I")
             if j < (p_clique_size):
-                # S_.append(f"{i}_{(i+j) % (p_clique_size)}")
+                # rotation
                 S.add(f"{i}_{(i+j) % (p_clique_size)}")
-                # print(f"{i}_{j}")
-    # S =  {S_[i] for i in range(len(S_))}
     return S
 
+# ======
+# Create random graphs:
+# ======
+
+def create_random_d_regular_graph(seed=None):
+    n = random.randint(10, 30)
+    rng = random.Random(seed)
+    possible_d = [d for d in range(3, n // 2 + 1) if (n * d) % 2 == 0]
+    d = rng.choice(possible_d)
+    G = nx.random_regular_graph(d, n, seed=seed)
+    pos = nx.spring_layout(G, seed=42) 
+    return G, pos
+
+def create_random_even_cycle_graph(seed=None):
+    min_n, max_n = 8, 30
+    rng = random.Random(seed)
+    possible_n = [num for num in range(min_n, max_n + 1) if num % 2 == 0]
+    n = rng.choice(possible_n)
+    G = nx.cycle_graph(n)
+    pos = nx.circular_layout(G)  
+    return G, pos, n
 
 def generate_random_cut(G, seed=None):
     nodes = list(G.nodes())
@@ -90,10 +70,8 @@ def generate_random_cut(G, seed=None):
     S = set(rng.sample(nodes, size))
     return S
 
-# Create a ring of cliques of any desired size.
-
-
 def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
+    ''' Generates ring of cliques of any desired size. '''
     num_cliques = p_num_cliques
     clique_size = p_clique_size
     d = clique_size - 1
@@ -134,37 +112,31 @@ def create_ring_of_cliques(p_num_cliques: int, p_clique_size: int):
         G.add_edge(u, v)
     return G, pos
 
-# Flip operation according to Giakkoupis paper.
+
 def flip_operation(G, num_cliques, size_of_cliques, rng=random):
-    # 1) Zufälligen Knoten label-basiert wählen (O(1))
+    ''' Executes flip operation as in Giakkoupis paper. '''
+    # 1) Choose a random node based on label
     i = rng.randrange(num_cliques)
     j = rng.randrange(size_of_cliques)
     a = f"{i}_{j}"
-    # if a not in G:  # sehr defensiv
-    # a = rng.choice(tuple(G.nodes()))
-
-    # 2) Zufälligen Nachbarn b von a wählen (O(d))
+    # 2) Choose a random neighbour of a 
     Na_view = G.adj[a]
-    if not Na_view:  # sollte in d-regulär nie passieren
+    if not Na_view: 
         return G, None, None, None
     b = rng.choice(tuple(Na_view))
-
-    # 3) Nachbarschaften als Sets (einmal)
+    # 3) Neighbourhoods obly initially as sets (for effiecency)
     Na = set(Na_view)
     Nb = set(G.adj[b])
-
-    # Erlaubte Kandidaten gleich berechnen (reduziert Rejections)
+    # Possible candidates for b'
     allowed_A = Na - {b} - Nb          # a' ∈ N(a)\{b}\N(b)
     if not allowed_A:
         return G, None, None, None
     allowed_B = Nb - {a} - Na          # b' ∈ N(b)\{a}\N(a)
     if not allowed_B:
         return G, None, None, None
-
     a_prime = rng.choice(tuple(allowed_A))
     b_prime = rng.choice(tuple(allowed_B))
-
-    # 4) Flip durchführen (Grad bleibt erhalten)
+    # 4) Execute flip operation
     G.remove_edge(a, a_prime)
     G.remove_edge(b, b_prime)
     G.add_edge(a, b_prime)
@@ -172,63 +144,8 @@ def flip_operation(G, num_cliques, size_of_cliques, rng=random):
 
     return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}, (a, b)
 
-r'''
-# Flip operation according to Giakkoupis paper.
-def flip_operation(G):
-    # Kein deepcopy hier – wir mutieren G nur bei Erfolg.
-    # 1) zufällige (ungerichtete) Kante wählen
-    a, b = random.choice(tuple(G.edges()))
-
-    # 2) Nachbarschaften einmalig als Sets
-    Na = set(G.adj[a])   # == set(G.neighbors(a)), aber ohne wiederholte Konvertierung
-    Nb = set(G.adj[b])
-
-    # a' gleichmäßig aus N(a) wählen (darf auch b sein – Filter kommt in Schritt 3)
-    a_prime = random.choice(tuple(Na))
-
-    # 3) Bedingungen prüfen:
-    #    a' ∈ N(a)\{b}\N(b)  und  N(b)\{a}\N(a) ≠ ∅
-    allowed_B = Nb - {a} - Na
-    if (a_prime in (Na - {b} - Nb)) and allowed_B:
-        # 3.1) b' ∈ N(b)\{a}\N(a) wählen
-        b_prime = random.choice(tuple(allowed_B))
-
-        # 3.2) Flip durchführen
-        G.remove_edge(a, a_prime)
-        G.remove_edge(b, b_prime)
-        G.add_edge(a, b_prime)
-        G.add_edge(b, a_prime)
-
-        return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}
-    else:
-        # kein Flip – G bleibt unverändert
-        return G, None, None
-'''
-
-r'''
-def flip_operation(G):
-    # 1. Choose an (ordered) pair of adjacent vertices a,b in V (this is the hub-edge)
-    a, b = random.choice(list(G.edges))
-    # 2. Choose a vertex a' in T(a) (possibly, a' = b)
-    a_prime = random.choice(list(set(G.neighbors(a))))
-    # 3. If the following two conditions hold: a' in T(a) \ T+(b) AND T(b) \ T+(a) not empty
-    if (a_prime in list(set(G.neighbors(a)) - {b} - set(G.neighbors(b)))) and not (list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))) == []):
-        # 3.1. Choose a vertex b' in T(b) \ T+(a)
-        b_prime = random.choice(
-            list(set(G.neighbors(b)) - {a} - set(G.neighbors(a))))
-        # 3.2. Replace edges (a, a_prime), (b, b_prime) with (a, b_prime), (b, a_prime)
-        G.add_edge(a, b_prime)
-        G.add_edge(b, a_prime)
-        G.remove_edge(a, a_prime)
-        G.remove_edge(b, b_prime)
-        return G, {(a, a_prime), (b, b_prime)}, {(a, b_prime), (b, a_prime)}
-    else:
-        return G, None, None
-'''
-# Flip operation according to Schindelhauer/Mahlmann paper.
-
-
 def flip_operation_old(G):
+    ''' Flip operation as in Schindelhauer/Mahlmann paper '''
     G = copy.deepcopy(G)
     a, b = random.choice(list(G.edges))
     possible_c = list(set(G.neighbors(b)) - {a})
